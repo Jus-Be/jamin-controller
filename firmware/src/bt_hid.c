@@ -25,13 +25,19 @@
 
 #include "bt_hid.h"
 #include "pico/stdlib.h"
-#include "pico/bootsel_button.h"
 #include "pico/flash.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
 #include "btstack.h"
 #include <string.h>
 #include <stdio.h>
+
+#if __has_include("pico/bootsel_button.h")
+#include "pico/bootsel_button.h"
+#define read_bootsel_button() get_bootsel_button()
+#else
+#define read_bootsel_button() false
+#endif
 
 /* ── Flash storage for paired address ──────────────────────────────────── */
 /* Store 6-byte BD_ADDR + 2-byte magic in last sector of 2 MB flash */
@@ -362,7 +368,7 @@ void bt_hid_init(bt_hid_key_down_cb_t on_key_down,
         set_led_mode(LED_MODE_OFF);
     }
 
-    s_force_discovery = get_bootsel_button();
+    s_force_discovery = read_bootsel_button();
     if (s_force_discovery) {
         printf("BT: BOOTSEL held at boot, discovery mode enabled\n");
     }
