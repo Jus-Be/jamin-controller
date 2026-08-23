@@ -34,8 +34,8 @@ int main(void)
     printf("jamin-controller starting\n");
 
     /* Initialise MIDI UART */
-    midi_init();
-    printf("MIDI UART ready\n");
+    //midi_init();
+    //printf("MIDI UART ready\n");
 
     /* Initialise keyboard state */
     keyboard_state_init(&g_state);
