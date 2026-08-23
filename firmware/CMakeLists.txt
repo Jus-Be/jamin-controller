@@ -7,8 +7,8 @@ set(FAMILY rp2040)
 
 # Pull in Pico SDK (must happen before project())
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-
-project(jamin_controller C CXX ASM)
+string(TIMESTAMP DATEVER "%Y.%m.%d" UTC)
+project(jamin_controller VERSION ${DATEVER} LANGUAGES C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
