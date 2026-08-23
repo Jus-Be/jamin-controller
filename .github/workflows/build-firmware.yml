@@ -1,0 +1,74 @@
+name: Build Firmware UF2
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - "firmware/**"
+      - ".github/workflows/build-firmware.yml"
+  pull_request:
+    paths:
+      - "firmware/**"
+      - ".github/workflows/build-firmware.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build jamin-controller UF2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            cmake \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            libstdc++-arm-none-eabi-newlib \
+            python3 \
+            git \
+            ninja-build
+
+      - name: Check out Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+
+      - name: Check out BTstack (bundled in Pico SDK submodule)
+        # pico-sdk submodules already include btstack; no extra step needed.
+        run: echo "BTstack is a pico-sdk submodule – already checked out."
+
+      - name: Configure CMake
+        env:
+          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+          PICO_BOARD: pico2_w
+        run: |
+          cmake -S firmware -B firmware/build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DPICO_BOARD=${PICO_BOARD} \
+            -DPICO_SDK_PATH=${PICO_SDK_PATH}
+
+      - name: Build
+        run: cmake --build firmware/build --parallel
+
+      - name: Locate UF2
+        id: locate_uf2
+        run: |
+          UF2=$(find firmware/build -name "*.uf2" | head -1)
+          echo "uf2_path=${UF2}" >> "$GITHUB_OUTPUT"
+          echo "Found UF2: ${UF2}"
+
+      - name: Upload UF2 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jamin-controller-firmware
+          path: ${{ steps.locate_uf2.outputs.uf2_path }}
+          if-no-files-found: error

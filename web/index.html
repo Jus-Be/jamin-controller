@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>jamin-controller – WAV File Manager &amp; WAV Trigger Pro Preset Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+    header {
+      background: #16213e;
+      padding: 1rem 2rem;
+      border-bottom: 2px solid #0f3460;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    header h1 { margin: 0; font-size: 1.4rem; color: #e94560; }
+    header p  { margin: 0; font-size: 0.85rem; color: #aaa; }
+    nav {
+      background: #16213e;
+      display: flex;
+      gap: 0;
+    }
+    nav button {
+      flex: 1;
+      padding: 0.75rem;
+      border: none;
+      background: transparent;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-bottom: 3px solid transparent;
+      transition: all 0.15s;
+    }
+    nav button.active, nav button:hover {
+      color: #e94560;
+      border-bottom-color: #e94560;
+    }
+    main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    section { display: none; }
+    section.visible { display: block; }
+    h2 { color: #e94560; margin-top: 0; }
+    label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: #aaa; }
+    select, input[type="text"], input[type="number"] {
+      background: #0f3460;
+      border: 1px solid #1a4080;
+      color: #e0e0e0;
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+      width: 100%;
+      margin-bottom: 0.8rem;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #1a4080;
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+    }
+    th { background: #0f3460; }
+    tr:nth-child(even) td { background: #12294e; }
+    button.primary {
+      background: #e94560;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+    button.primary:hover { background: #c73652; }
+    button.secondary {
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #1a4080;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .tag {
+      display: inline-block;
+      background: #0f3460;
+      border: 1px solid #1a4080;
+      border-radius: 3px;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.75rem;
+      margin: 0.1rem;
+    }
+    .note { background: #12294e; border-left: 3px solid #e94560;
+            padding: 0.6rem 0.8rem; border-radius: 4px; margin: 0.8rem 0;
+            font-size: 0.82rem; }
+    #preset-table-wrap { max-height: 400px; overflow-y: auto; }
+    #rename-list { max-height: 500px; overflow-y: auto; }
+    #rename-list .rename-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.3rem;
+    }
+    #rename-list .rename-row input { margin-bottom: 0; }
+    #rename-list .rename-row span { font-size: 0.78rem; color: #e94560; }
+    footer { text-align: center; padding: 1rem; color: #555; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🎹 jamin-controller</h1>
+    <p>WAV File Manager &amp; WAV Trigger Pro Preset Builder</p>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('tab-rename', this)">Rename &amp; Download WAVs</button>
+  <button onclick="showTab('tab-preset', this)">Build Preset CSV</button>
+  <button onclick="showTab('tab-layout', this)">File Layout Reference</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 1 – Rename & Download WAVs                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="tab-rename" class="visible">
+  <h2>Rename &amp; Download WAV Files</h2>
+  <p>Upload your WAV files, assign them to SD-card slots, and download
+     them renamed to the exact numeric filename the WAV Trigger Pro expects
+     (e.g. <code>0001.WAV</code> … <code>4096.WAV</code>).</p>
+
+  <div class="grid2">
+    <div>
+      <label>File category</label>
+      <select id="cat-select" onchange="refreshRenamePreview()">
+        <option value="chord">Chord loop</option>
+        <option value="bass">Bass loop</option>
+        <option value="perc">Percussion loop</option>
+        <option value="riff">Melody riff</option>
+        <option value="hit">One-off hit</option>
+      </select>
+    </div>
+    <div id="chord-opts">
+      <div class="grid2">
+        <div>
+          <label>Project (1-20)</label>
+          <input type="number" id="opt-project" min="1" max="20" value="1"
+                 onchange="refreshRenamePreview()" />
+        </div>
+        <div>
+          <label>Root note</label>
+          <select id="opt-root" onchange="refreshRenamePreview()">
+            <option value="0">C</option><option value="1">C#</option>
+            <option value="2">D</option><option value="3">D#</option>
+            <option value="4">E</option><option value="5">F</option>
+            <option value="6">F#</option><option value="7">G</option>
+            <option value="8">G#</option><option value="9">A</option>
+            <option value="10">A#</option><option value="11">B</option>
+          </select>
+        </div>
+        <div>
+          <label>Chord / bass type</label>
+          <select id="opt-type" onchange="refreshRenamePreview()">
+            <option value="0">Major</option>
+            <option value="1">Minor</option>
+            <option value="2">Sus2</option>
+            <option value="3">Sus4</option>
+          </select>
+        </div>
+        <div>
+          <label>Variation (1-2)</label>
+          <input type="number" id="opt-variation" min="1" max="2" value="1"
+                 onchange="refreshRenamePreview()" />
+        </div>
+      </div>
+    </div>
+    <div id="perc-opts" style="display:none">
+      <div class="grid2">
+        <div>
+          <label>Project (1-20)</label>
+          <input type="number" id="opt-perc-project" min="1" max="20" value="1"
+                 onchange="refreshRenamePreview()" />
+        </div>
+        <div>
+          <label>Percussion slot</label>
+          <select id="opt-perc-slot" onchange="refreshRenamePreview()">
+            <option value="0">Intro</option>
+            <option value="1">End</option>
+            <option value="2">Variation 1</option>
+            <option value="3">Variation 2</option>
+            <option value="4">Variation 3</option>
+            <option value="5">Variation 4</option>
+            <option value="6">Fill 1</option>
+            <option value="7">Fill 2</option>
+            <option value="8">Fill 3</option>
+            <option value="9">Fill 4</option>
+            <option value="10">Break 1</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="riff-opts" style="display:none">
+      <div class="grid2">
+        <div>
+          <label>Harmony class (0-15)</label>
+          <input type="number" id="opt-hclass" min="0" max="15" value="0"
+                 onchange="refreshRenamePreview()" />
+        </div>
+        <div>
+          <label>Key (root 0-11)</label>
+          <select id="opt-rkey" onchange="refreshRenamePreview()">
+            <option value="0">C</option><option value="1">C#</option>
+            <option value="2">D</option><option value="3">D#</option>
+            <option value="4">E</option><option value="5">F</option>
+            <option value="6">F#</option><option value="7">G</option>
+            <option value="8">G#</option><option value="9">A</option>
+            <option value="10">A#</option><option value="11">B</option>
+          </select>
+        </div>
+        <div>
+          <label>Riff slot (1-2)</label>
+          <input type="number" id="opt-rslot" min="1" max="2" value="1"
+                 onchange="refreshRenamePreview()" />
+        </div>
+      </div>
+    </div>
+    <div id="hit-opts" style="display:none">
+      <label>Hit slot (1-512)</label>
+      <input type="number" id="opt-hit" min="1" max="512" value="1"
+             onchange="refreshRenamePreview()" />
+    </div>
+  </div>
+
+  <div class="note" id="rename-preview">Target filename: –</div>
+
+  <label style="margin-top:1rem">Upload WAV files to rename</label>
+  <input type="file" id="file-input" multiple accept=".wav,.WAV"
+         onchange="handleFileUpload()" style="margin-bottom:0.8rem" />
+
+  <div id="rename-list"></div>
+  <button class="primary" onclick="downloadAllRenamed()" style="margin-top:0.5rem">
+    ⬇ Download All Renamed WAVs
+  </button>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 2 – Build Preset CSV                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="tab-preset">
+  <h2>Build WAV Trigger Pro Preset CSV</h2>
+  <p>Generate a <code>CONFIG.CSV</code> (or <code>PRESET.CSV</code>) file for
+     the WAV Trigger Pro board.  Each row maps a MIDI message to a WAV file
+     index on the SD card.</p>
+
+  <div class="grid2">
+    <div>
+      <label>Number of projects to include (1-20)</label>
+      <input type="number" id="csv-projects" min="1" max="20" value="1"
+             oninput="generatePresetTable()" />
+    </div>
+    <div>
+      <label>Include global sections</label>
+      <select id="csv-global" onchange="generatePresetTable()">
+        <option value="both">Hits &amp; Riffs</option>
+        <option value="hits">Hits only</option>
+        <option value="riffs">Riffs only</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="primary" onclick="generatePresetTable()">🔄 Generate Preview</button>
+  <button class="primary" onclick="downloadCSV()" style="margin-left:0.5rem">
+    ⬇ Download CONFIG.CSV
+  </button>
+
+  <div class="note" style="margin-top:1rem">
+    The CSV format follows the WAV Trigger Pro specification:
+    <code>Track, MIDI CH, MIDI Note, Loop, Gain, … </code>
+  </div>
+
+  <div id="preset-table-wrap">
+    <table id="preset-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Track (WAV index)</th><th>Filename</th>
+          <th>MIDI CH</th><th>MIDI Note</th><th>Loop</th><th>Description</th>
+        </tr>
+      </thead>
+      <tbody id="preset-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 3 – File Layout Reference                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="tab-layout">
+  <h2>SD Card File Layout Reference</h2>
+
+  <div class="note">
+    Total SD card capacity: <strong>4096 WAV files</strong> (1-based indices 0001 – 4096).
+  </div>
+
+  <h3 style="color:#e94560">Project Section (indices 1 – 3120)</h3>
+  <p>20 projects × 156 files each = 3120 files.</p>
+  <table>
+    <thead>
+      <tr><th>Offset within project</th><th>Count</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0 – 95</td><td>96</td><td>48 chord loops × 2 variations
+          (Major/Minor/Sus2/Sus4 for C..B)</td></tr>
+      <tr><td>96 – 143</td><td>48</td><td>24 bass loops × 2 variations
+          (Major &amp; Minor for C..B)</td></tr>
+      <tr><td>144 – 154</td><td>11</td><td>Percussion loops:
+          Intro, End, Var1-4, Fill1-4, Break1-2</td></tr>
+      <tr><td>155</td><td>1</td><td>Reserved / padding</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="color:#e94560">Global Section (indices 3121 – 4096)</h3>
+  <table>
+    <thead>
+      <tr><th>Range</th><th>Count</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>3121 – 3632</td><td>512</td><td>One-off hit sounds</td></tr>
+      <tr><td>3633 – 4096</td><td>464</td><td>Harmonic melody riffs
+          (16 harmony classes × 12 keys × 2 slots = 384 used,
+           remainder reserved)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="color:#e94560">Harmony Classes</h3>
+  <p>A harmony class is a 4-bit bitmask of simultaneously active chord types:</p>
+  <div class="grid3">
+    <span class="tag">bit 0 = Major</span>
+    <span class="tag">bit 1 = Minor</span>
+    <span class="tag">bit 2 = Sus2</span>
+    <span class="tag">bit 3 = Sus4</span>
+  </div>
+  <p style="font-size:0.85rem;margin-top:0.5rem">
+    Example: playing a Major and a Minor chord simultaneously → class = 0b0011 = 3.
+  </p>
+
+  <h3 style="color:#e94560">MIDI Channel Assignments</h3>
+  <table>
+    <thead>
+      <tr><th>MIDI CH</th><th>Category</th><th>Loop?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Chord loops (bank 0: WAVs 1-128)</td><td>Yes</td></tr>
+      <tr><td>2</td><td>Chord loops (bank 1: WAVs 129-256) &amp; Bass loops</td><td>Yes</td></tr>
+      <tr><td>3</td><td>Chord loops (bank 2) &amp; Percussion loops</td><td>Yes / Yes</td></tr>
+      <tr><td>4</td><td>Melody riffs</td><td>One-shot</td></tr>
+      <tr><td>10</td><td>One-off hits</td><td>One-shot</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<footer>jamin-controller – open-source embedded musical instrument</footer>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════ */
+/* Constants matching firmware/src/wav_index.h                             */
+/* ════════════════════════════════════════════════════════════════════════ */
+const MAX_PROJECTS      = 20;
+const FILES_PER_PROJECT = 156;
+const CHORD_LOOPS       = 48;
+const CHORD_VARIATIONS  = 2;
+const BASS_LOOPS        = 24;
+const BASS_VARIATIONS   = 2;
+const PERC_LOOPS        = 11;
+const CHORD_OFFSET      = 0;
+const BASS_OFFSET       = CHORD_LOOPS * CHORD_VARIATIONS;      // 96
+const PERC_OFFSET       = BASS_OFFSET + BASS_LOOPS * BASS_VARIATIONS; // 144
+const PROJECT_BASE      = 1;
+const GLOBAL_BASE       = MAX_PROJECTS * FILES_PER_PROJECT + 1; // 3121
+const HIT_BASE          = GLOBAL_BASE;
+const HIT_TOTAL         = 512;
+const RIFF_BASE         = HIT_BASE + HIT_TOTAL;                // 3633
+const RIFF_TOTAL        = 464;
+const HARMONY_CLASS_COUNT = 16;
+const KEYS_PER_CLASS    = 12;
+const RIFFS_PER_KEY     = 2;
+const CHORD_TYPE_COUNT  = 4;
+
+const MIDI_CH_CHORD = 1;
+const MIDI_CH_BASS  = 2;
+const MIDI_CH_PERC  = 3;
+const MIDI_CH_RIFF  = 4;
+const MIDI_CH_HIT   = 10;
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const CHORD_NAMES = ['Major','Minor','Sus2','Sus4'];
+const PERC_NAMES  = ['Intro','End','Var1','Var2','Var3','Var4',
+                     'Fill1','Fill2','Fill3','Fill4','Break1'];
+
+/* ── Index computation (mirrors wav_index.c) ──────────────────────────── */
+function wavIndexChord(project, root, type, variation) {
+  if (project >= MAX_PROJECTS || root >= 12 ||
+      type >= CHORD_TYPE_COUNT || variation >= CHORD_VARIATIONS) return 0;
+  const pb = PROJECT_BASE + project * FILES_PER_PROJECT;
+  const ci = (root * CHORD_TYPE_COUNT + type) * CHORD_VARIATIONS + variation;
+  return pb + CHORD_OFFSET + ci;
+}
+function wavIndexBass(project, root, minor, variation) {
+  if (project >= MAX_PROJECTS || root >= 12 ||
+      minor > 1 || variation >= BASS_VARIATIONS) return 0;
+  const pb = PROJECT_BASE + project * FILES_PER_PROJECT;
+  const bi = (root * 2 + minor) * BASS_VARIATIONS + variation;
+  return pb + BASS_OFFSET + bi;
+}
+function wavIndexPerc(project, slot) {
+  if (project >= MAX_PROJECTS || slot >= PERC_LOOPS) return 0;
+  const pb = PROJECT_BASE + project * FILES_PER_PROJECT;
+  return pb + PERC_OFFSET + slot;
+}
+function wavIndexRiff(harmonyClass, key, riffSlot) {
+  if (harmonyClass >= HARMONY_CLASS_COUNT ||
+      key >= KEYS_PER_CLASS || riffSlot >= RIFFS_PER_KEY) return 0;
+  const idx = harmonyClass * (KEYS_PER_CLASS * RIFFS_PER_KEY)
+            + key * RIFFS_PER_KEY + riffSlot;
+  if (idx >= RIFF_TOTAL) return 0;
+  return RIFF_BASE + idx;
+}
+function wavIndexHit(hitSlot) {
+  if (hitSlot >= HIT_TOTAL) return 0;
+  return HIT_BASE + hitSlot;
+}
+
+function padIndex(n) {
+  return String(n).padStart(4, '0');
+}
+
+/* MIDI channel/note for a given WAV index */
+function midiForWav(wavIdx, baseChannel) {
+  const zero = wavIdx - 1;
+  const bank = Math.floor(zero / 128);
+  const note = zero % 128;
+  return { ch: baseChannel + bank, note };
+}
+
+/* ── Tab switching ────────────────────────────────────────────────────── */
+function showTab(id, btn) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('visible'));
+  document.getElementById(id).classList.add('visible');
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ── Rename tab ───────────────────────────────────────────────────────── */
+let uploadedFiles = [];
+
+function getCategoryOpts() {
+  const cat = document.getElementById('cat-select').value;
+  if (cat === 'chord') {
+    return {
+      project: parseInt(document.getElementById('opt-project').value) - 1,
+      root:    parseInt(document.getElementById('opt-root').value),
+      type:    parseInt(document.getElementById('opt-type').value),
+      variation: parseInt(document.getElementById('opt-variation').value) - 1,
+    };
+  } else if (cat === 'bass') {
+    return {
+      project: parseInt(document.getElementById('opt-project').value) - 1,
+      root:    parseInt(document.getElementById('opt-root').value),
+      type:    parseInt(document.getElementById('opt-type').value),  // 0=maj 1=min
+      variation: parseInt(document.getElementById('opt-variation').value) - 1,
+    };
+  } else if (cat === 'perc') {
+    return {
+      project: parseInt(document.getElementById('opt-perc-project').value) - 1,
+      slot:    parseInt(document.getElementById('opt-perc-slot').value),
+    };
+  } else if (cat === 'riff') {
+    return {
+      hclass: parseInt(document.getElementById('opt-hclass').value),
+      key:    parseInt(document.getElementById('opt-rkey').value),
+      rslot:  parseInt(document.getElementById('opt-rslot').value) - 1,
+    };
+  } else {
+    return { hit: parseInt(document.getElementById('opt-hit').value) - 1 };
+  }
+}
+
+function computeBaseWavIndex() {
+  const cat  = document.getElementById('cat-select').value;
+  const opts = getCategoryOpts();
+  if (cat === 'chord') {
+    return wavIndexChord(opts.project, opts.root, opts.type, opts.variation);
+  } else if (cat === 'bass') {
+    return wavIndexBass(opts.project, opts.root, opts.type, opts.variation);
+  } else if (cat === 'perc') {
+    return wavIndexPerc(opts.project, opts.slot);
+  } else if (cat === 'riff') {
+    return wavIndexRiff(opts.hclass, opts.key, opts.rslot);
+  } else {
+    return wavIndexHit(opts.hit);
+  }
+}
+
+function refreshRenamePreview() {
+  const cat = document.getElementById('cat-select').value;
+  // Show/hide option panels
+  document.getElementById('chord-opts').style.display =
+    (cat === 'chord' || cat === 'bass') ? '' : 'none';
+  document.getElementById('perc-opts').style.display =
+    cat === 'perc' ? '' : 'none';
+  document.getElementById('riff-opts').style.display =
+    cat === 'riff' ? '' : 'none';
+  document.getElementById('hit-opts').style.display =
+    cat === 'hit' ? '' : 'none';
+
+  const idx = computeBaseWavIndex();
+  document.getElementById('rename-preview').textContent =
+    idx > 0 ? `Target filename: ${padIndex(idx)}.WAV` : 'Target filename: (invalid selection)';
+
+  renderRenameList();
+}
+
+function handleFileUpload() {
+  const files = document.getElementById('file-input').files;
+  uploadedFiles = Array.from(files);
+  renderRenameList();
+}
+
+function renderRenameList() {
+  const container = document.getElementById('rename-list');
+  container.innerHTML = '';
+  if (uploadedFiles.length === 0) return;
+
+  const baseIdx = computeBaseWavIndex();
+  uploadedFiles.forEach((f, i) => {
+    const targetIdx = baseIdx + i;
+    const valid = targetIdx > 0 && targetIdx <= 4096;
+    const row = document.createElement('div');
+    row.className = 'rename-row';
+    row.innerHTML = `
+      <span style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            title="${f.name}">${f.name}</span>
+      <span style="font-size:0.82rem;color:${valid ? '#4caf50' : '#e94560'}">
+        → ${valid ? padIndex(targetIdx) + '.WAV' : 'OUT OF RANGE'}
+      </span>
+      <button class="secondary" onclick="downloadSingle(${i})" ${valid ? '' : 'disabled'}>
+        ⬇
+      </button>`;
+    container.appendChild(row);
+  });
+}
+
+function downloadSingle(i) {
+  const baseIdx = computeBaseWavIndex();
+  const targetIdx = baseIdx + i;
+  if (targetIdx < 1 || targetIdx > 4096) return;
+  const file = uploadedFiles[i];
+  const url  = URL.createObjectURL(file);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = padIndex(targetIdx) + '.WAV';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadAllRenamed() {
+  const baseIdx = computeBaseWavIndex();
+  for (let i = 0; i < uploadedFiles.length; i++) {
+    const targetIdx = baseIdx + i;
+    if (targetIdx < 1 || targetIdx > 4096) continue;
+    await new Promise(resolve => {
+      const url = URL.createObjectURL(uploadedFiles[i]);
+      const a   = document.createElement('a');
+      a.href    = url;
+      a.download = padIndex(targetIdx) + '.WAV';
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); resolve(); }, 100);
+    });
+  }
+}
+
+/* ── Preset CSV tab ───────────────────────────────────────────────────── */
+let csvRows = [];
+
+function generatePresetTable() {
+  const numProjects = Math.min(20, Math.max(1,
+    parseInt(document.getElementById('csv-projects').value) || 1));
+  const globalMode = document.getElementById('csv-global').value;
+  csvRows = [];
+
+  /* Project section */
+  for (let p = 0; p < numProjects; p++) {
+    /* Chord loops */
+    for (let root = 0; root < 12; root++) {
+      for (let type = 0; type < 4; type++) {
+        for (let v = 0; v < 2; v++) {
+          const idx = wavIndexChord(p, root, type, v);
+          if (!idx) continue;
+          const m = midiForWav(idx, MIDI_CH_CHORD);
+          csvRows.push({
+            idx, filename: padIndex(idx) + '.WAV',
+            ch: m.ch, note: m.note, loop: 1,
+            desc: `P${p+1} Chord ${NOTE_NAMES[root]} ${CHORD_NAMES[type]} V${v+1}`
+          });
+        }
+      }
+    }
+    /* Bass loops */
+    for (let root = 0; root < 12; root++) {
+      for (let minor = 0; minor < 2; minor++) {
+        for (let v = 0; v < 2; v++) {
+          const idx = wavIndexBass(p, root, minor, v);
+          if (!idx) continue;
+          const m = midiForWav(idx, MIDI_CH_BASS);
+          csvRows.push({
+            idx, filename: padIndex(idx) + '.WAV',
+            ch: m.ch, note: m.note, loop: 1,
+            desc: `P${p+1} Bass ${NOTE_NAMES[root]} ${minor ? 'Min' : 'Maj'} V${v+1}`
+          });
+        }
+      }
+    }
+    /* Percussion */
+    for (let slot = 0; slot < PERC_LOOPS; slot++) {
+      const idx = wavIndexPerc(p, slot);
+      if (!idx) continue;
+      const m = midiForWav(idx, MIDI_CH_PERC);
+      csvRows.push({
+        idx, filename: padIndex(idx) + '.WAV',
+        ch: m.ch, note: m.note, loop: 1,
+        desc: `P${p+1} Perc ${PERC_NAMES[slot]}`
+      });
+    }
+  }
+
+  /* Global: hits */
+  if (globalMode === 'both' || globalMode === 'hits') {
+    for (let h = 0; h < HIT_TOTAL; h++) {
+      const idx = wavIndexHit(h);
+      if (!idx) continue;
+      const m = midiForWav(idx, MIDI_CH_HIT);
+      csvRows.push({
+        idx, filename: padIndex(idx) + '.WAV',
+        ch: m.ch, note: m.note, loop: 0,
+        desc: `Hit ${h+1}`
+      });
+    }
+  }
+
+  /* Global: riffs */
+  if (globalMode === 'both' || globalMode === 'riffs') {
+    for (let hc = 0; hc < HARMONY_CLASS_COUNT; hc++) {
+      for (let key = 0; key < 12; key++) {
+        for (let rs = 0; rs < RIFFS_PER_KEY; rs++) {
+          const idx = wavIndexRiff(hc, key, rs);
+          if (!idx) continue;
+          const m = midiForWav(idx, MIDI_CH_RIFF);
+          csvRows.push({
+            idx, filename: padIndex(idx) + '.WAV',
+            ch: m.ch, note: m.note, loop: 0,
+            desc: `Riff HC${hc} ${NOTE_NAMES[key]} S${rs+1}`
+          });
+        }
+      }
+    }
+  }
+
+  /* Render table (first 200 rows for performance) */
+  const tbody = document.getElementById('preset-tbody');
+  tbody.innerHTML = '';
+  const display = csvRows.slice(0, 200);
+  display.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${r.idx}</td><td>${r.filename}</td>
+      <td>${r.ch}</td><td>${r.note}</td><td>${r.loop ? 'Yes' : 'No'}</td>
+      <td>${r.desc}</td>`;
+    tbody.appendChild(tr);
+  });
+  if (csvRows.length > 200) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="7" style="text-align:center;color:#aaa">
+      … and ${csvRows.length - 200} more rows (download CSV for full list)</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function downloadCSV() {
+  if (csvRows.length === 0) generatePresetTable();
+  const header = 'Track,Filename,MIDI_CH,MIDI_Note,Loop,Description\n';
+  const body   = csvRows.map(r =>
+    `${r.idx},${r.filename},${r.ch},${r.note},${r.loop},${r.desc}`
+  ).join('\n');
+  const blob = new Blob([header + body], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'CONFIG.CSV';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── Init ─────────────────────────────────────────────────────────────── */
+refreshRenamePreview();
+generatePresetTable();
+</script>
+</body>
+</html>
