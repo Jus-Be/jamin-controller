@@ -25,6 +25,7 @@
 
 #include "bt_hid.h"
 #include "pico/stdlib.h"
+#include "pico/bootsel_button.h"
 #include "pico/flash.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
@@ -40,6 +41,8 @@
 
 static bd_addr_t s_paired_addr;
 static bool      s_has_paired_addr = false;
+static bool      s_force_discovery = false;
+static bool      s_inquiry_active  = false;
 
 /* ── Callback pointers ──────────────────────────────────────────────────── */
 static bt_hid_key_down_cb_t s_on_key_down = NULL;
@@ -55,6 +58,108 @@ static uint16_t s_hid_cid = 0;
 
 /* ── BTstack objects ────────────────────────────────────────────────────── */
 static btstack_packet_callback_registration_t s_hci_event_cb_reg;
+static btstack_timer_source_t                 s_led_timer;
+
+/* ── Status LED ─────────────────────────────────────────────────────────── */
+typedef enum {
+    LED_MODE_OFF = 0,
+    LED_MODE_ON,
+    LED_MODE_BLINK_SLOW,
+    LED_MODE_BLINK_FAST,
+} led_mode_t;
+
+static led_mode_t s_led_mode = LED_MODE_OFF;
+static bool       s_led_mode_ready = false;
+static bool       s_led_level = false;
+
+#define LED_BLINK_SLOW_MS 500
+#define LED_BLINK_FAST_MS 150
+
+static bool led_available(void)
+{
+#ifdef PICO_DEFAULT_LED_PIN
+    return true;
+#else
+    return false;
+#endif
+}
+
+static void led_write(bool on)
+{
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_put(PICO_DEFAULT_LED_PIN, on ? 1 : 0);
+    s_led_level = on;
+#else
+    (void)on;
+#endif
+}
+
+static void led_timer_handler(btstack_timer_source_t *ts)
+{
+    (void)ts;
+    if (!led_available()) return;
+
+    switch (s_led_mode) {
+        case LED_MODE_BLINK_SLOW:
+            led_write(!s_led_level);
+            btstack_run_loop_set_timer(&s_led_timer, LED_BLINK_SLOW_MS);
+            btstack_run_loop_add_timer(&s_led_timer);
+            break;
+        case LED_MODE_BLINK_FAST:
+            led_write(!s_led_level);
+            btstack_run_loop_set_timer(&s_led_timer, LED_BLINK_FAST_MS);
+            btstack_run_loop_add_timer(&s_led_timer);
+            break;
+        case LED_MODE_ON:
+            led_write(true);
+            break;
+        case LED_MODE_OFF:
+        default:
+            led_write(false);
+            break;
+    }
+}
+
+static void set_led_mode(led_mode_t mode)
+{
+    if (!led_available()) return;
+    if (s_led_mode_ready && s_led_mode == mode) return;
+
+    btstack_run_loop_remove_timer(&s_led_timer);
+    s_led_mode = mode;
+    s_led_mode_ready = true;
+
+    switch (s_led_mode) {
+        case LED_MODE_ON:
+            led_write(true);
+            break;
+        case LED_MODE_OFF:
+            led_write(false);
+            break;
+        case LED_MODE_BLINK_SLOW:
+            led_write(false);
+            btstack_run_loop_set_timer(&s_led_timer, LED_BLINK_SLOW_MS);
+            btstack_run_loop_add_timer(&s_led_timer);
+            break;
+        case LED_MODE_BLINK_FAST:
+            led_write(false);
+            btstack_run_loop_set_timer(&s_led_timer, LED_BLINK_FAST_MS);
+            btstack_run_loop_add_timer(&s_led_timer);
+            break;
+        default:
+            break;
+    }
+}
+
+static void start_discovery(void)
+{
+    if (!s_inquiry_active) {
+        printf("BT: starting inquiry\n");
+        gap_inquiry_start(10);
+        s_inquiry_active = true;
+    }
+    set_led_mode(LED_MODE_BLINK_FAST);
+}
 
 /* ── Report parsing ─────────────────────────────────────────────────────── */
 static void process_hid_report(const uint8_t *report, uint16_t len)
@@ -133,14 +238,17 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                 case BTSTACK_EVENT_STATE:
                     if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
                         printf("BT: stack working\n");
-                        if (s_has_paired_addr) {
+                        if (s_has_paired_addr && !s_force_discovery) {
                             printf("BT: reconnecting to stored device\n");
+                            set_led_mode(LED_MODE_BLINK_SLOW);
                             hid_host_connect(s_paired_addr,
                                              HID_PROTOCOL_MODE_BOOT,
                                              &s_hid_cid);
                         } else {
-                            printf("BT: starting inquiry\n");
-                            gap_inquiry_start(10);
+                            if (s_force_discovery) {
+                                printf("BT: BOOTSEL held at boot, forcing discovery mode\n");
+                            }
+                            start_discovery();
                         }
                     }
                     break;
@@ -154,6 +262,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                     if ((cod & 0x1FFFu) == 0x0540u) {
                         printf("BT: found HID keyboard\n");
                         gap_inquiry_stop();
+                        s_inquiry_active = false;
+                        set_led_mode(LED_MODE_BLINK_SLOW);
                         hid_host_connect(addr, HID_PROTOCOL_MODE_BOOT,
                                          &s_hid_cid);
                     }
@@ -161,10 +271,11 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                 }
 
                 case GAP_EVENT_INQUIRY_COMPLETE:
+                    s_inquiry_active = false;
                     /* No keyboard found; retry */
                     if (!s_hid_cid) {
                         printf("BT: inquiry complete, retrying\n");
-                        gap_inquiry_start(10);
+                        start_discovery();
                     }
                     break;
 
@@ -181,14 +292,16 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                                 hid_subevent_connection_opened_get_bd_addr(packet, addr);
                                 memcpy(s_paired_addr, addr, 6);
                                 s_has_paired_addr = true;
+                                s_force_discovery = false;
                                 save_paired_addr(s_paired_addr);
                                 printf("BT: HID connected\n");
+                                set_led_mode(LED_MODE_ON);
                             } else {
                                 printf("BT: connect failed 0x%02x, rescanning\n",
                                        status);
                                 s_hid_cid = 0;
                                 s_has_paired_addr = false;
-                                gap_inquiry_start(10);
+                                start_discovery();
                             }
                             break;
                         }
@@ -196,12 +309,13 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                         case HID_SUBEVENT_CONNECTION_CLOSED:
                             printf("BT: disconnected, reconnecting\n");
                             s_hid_cid = 0;
-                            if (s_has_paired_addr) {
+                            if (s_has_paired_addr && !s_force_discovery) {
+                                set_led_mode(LED_MODE_BLINK_SLOW);
                                 hid_host_connect(s_paired_addr,
                                                  HID_PROTOCOL_MODE_BOOT,
                                                  &s_hid_cid);
                             } else {
-                                gap_inquiry_start(10);
+                                start_discovery();
                             }
                             break;
 
@@ -238,6 +352,20 @@ void bt_hid_init(bt_hid_key_down_cb_t on_key_down,
     s_on_key_up   = on_key_up;
 
     memset(s_prev_keycodes, 0, sizeof(s_prev_keycodes));
+    btstack_run_loop_set_timer_handler(&s_led_timer, led_timer_handler);
+
+    if (led_available()) {
+#ifdef PICO_DEFAULT_LED_PIN
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#endif
+        set_led_mode(LED_MODE_OFF);
+    }
+
+    s_force_discovery = get_bootsel_button();
+    if (s_force_discovery) {
+        printf("BT: BOOTSEL held at boot, discovery mode enabled\n");
+    }
 
     /* Try to load previously paired BD_ADDR from flash */
     s_has_paired_addr = load_paired_addr(s_paired_addr);
