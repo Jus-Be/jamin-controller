@@ -1,26 +1,18 @@
-cmake_minimum_required(VERSION 3.13)
-
-# Pull in Pico SDK (must happen before project())
-include(pico_sdk_import.cmake)
-
-project(jamin_controller C CXX ASM)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+cmake_minimum_required(VERSION 3.12)
 
 # Set Pico Board and Pico Platform
 set(PICO_PLATFORM rp2350-arm-s)
 set(PICO_BOARD pico2_w)
 set(FAMILY rp2040)
 
-pico_sdk_init()
+# Pull in Pico SDK (must happen before project())
+include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
-add_executable(jamin_controller
-    src/main.c
-    src/bt_hid.c
-    src/midi.c
-    src/wav_index.c
-    src/keyboard.c
-)
+project(jamin_controller C CXX ASM)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+pico_sdk_init()
 
 target_include_directories(jamin_controller PRIVATE src)
 
@@ -36,9 +28,21 @@ target_link_libraries(jamin_controller
     hardware_sync
 )
 
+add_executable(jamin_controller
+    src/main.c
+    src/bt_hid.c
+    src/midi.c
+    src/wav_index.c
+    src/keyboard.c
+)
+
 # Enable USB and UART stdio (UART stdio for debug, USB disabled to free resources)
 pico_enable_stdio_usb(jamin_controller 0)
 pico_enable_stdio_uart(jamin_controller 1)
 
 # Create map/bin/hex/uf2 output in addition to ELF
 pico_add_extra_outputs(jamin_controller)
+
+# CMake flags
+set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections")
