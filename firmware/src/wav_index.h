@@ -39,7 +39,7 @@
 #define CHORD_VARIATIONS    2
 #define BASS_LOOPS         24   /* 12 roots × 2 types (major/minor) */
 #define BASS_VARIATIONS     2
-#define PERC_LOOPS         11
+#define PERC_LOOPS         12
 
 /* ── Project section offsets (1-based) ──────────────────────────────────── */
 #define PROJECT_BASE        1
@@ -76,7 +76,7 @@ typedef enum {
     PERC_FILL3   = 8,
     PERC_FILL4   = 9,
     PERC_BREAK1  = 10,
-    PERC_BREAK2  = 11  /* only 11 used; slot 11 spare */
+    PERC_BREAK2  = 11
 } perc_slot_t;
 
 /* ── Harmony classes for melody riffs ───────────────────────────────────── */

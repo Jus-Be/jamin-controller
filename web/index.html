@@ -209,6 +209,7 @@
             <option value="8">Fill 3</option>
             <option value="9">Fill 4</option>
             <option value="10">Break 1</option>
+            <option value="11">Break 2</option>
           </select>
         </div>
       </div>
@@ -387,7 +388,7 @@ const CHORD_LOOPS       = 48;
 const CHORD_VARIATIONS  = 2;
 const BASS_LOOPS        = 24;
 const BASS_VARIATIONS   = 2;
-const PERC_LOOPS        = 11;
+const PERC_LOOPS        = 12;
 const CHORD_OFFSET      = 0;
 const BASS_OFFSET       = CHORD_LOOPS * CHORD_VARIATIONS;      // 96
 const PERC_OFFSET       = BASS_OFFSET + BASS_LOOPS * BASS_VARIATIONS; // 144
@@ -411,7 +412,7 @@ const MIDI_CH_HIT   = 10;
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const CHORD_NAMES = ['Major','Minor','Sus2','Sus4'];
 const PERC_NAMES  = ['Intro','End','Var1','Var2','Var3','Var4',
-                     'Fill1','Fill2','Fill3','Fill4','Break1'];
+                     'Fill1','Fill2','Fill3','Fill4','Break1','Break2'];
 
 /* ── Index computation (mirrors wav_index.c) ──────────────────────────── */
 function wavIndexChord(project, root, type, variation) {
@@ -528,6 +529,21 @@ function refreshRenamePreview() {
     cat === 'riff' ? '' : 'none';
   document.getElementById('hit-opts').style.display =
     cat === 'hit' ? '' : 'none';
+
+  // For bass, restrict type select to Major (0) and Minor (1) only.
+  const typeSelect = document.getElementById('opt-type');
+  const typeLabel  = typeSelect.previousElementSibling;
+  if (cat === 'bass') {
+    typeLabel.textContent = 'Bass type';
+    // Remove Sus2/Sus4 options if present and clamp selection
+    Array.from(typeSelect.options).forEach(opt => {
+      opt.hidden = parseInt(opt.value) > 1;
+    });
+    if (parseInt(typeSelect.value) > 1) typeSelect.value = '0';
+  } else if (cat === 'chord') {
+    typeLabel.textContent = 'Chord type';
+    Array.from(typeSelect.options).forEach(opt => { opt.hidden = false; });
+  }
 
   const idx = computeBaseWavIndex();
   document.getElementById('rename-preview').textContent =

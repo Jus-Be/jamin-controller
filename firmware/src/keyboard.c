@@ -48,11 +48,17 @@ static const struct { uint8_t keycode; uint8_t slot; } zone3_map[] = {
 /* Diatonic scale degrees for the 5 columns (semitone offsets from root) */
 static const uint8_t DIATONIC_OFFSETS[5] = { 0, 2, 4, 7, 9 }; /* I II III V VI */
 
+/* Declared here, defined in Zone 2 section below */
+static chord_type_t s_held_z2_type[ZONE2_KEY_COUNT];
+static bool         s_held_z2_active[ZONE2_KEY_COUNT];
+
 /* ── State management ───────────────────────────────────────────────────── */
 
 void keyboard_state_init(jamin_state_t *state)
 {
     memset(state, 0, sizeof(*state));
+    memset(s_held_z2_type,   0, sizeof(s_held_z2_type));
+    memset(s_held_z2_active, 0, sizeof(s_held_z2_active));
 }
 
 /* Recompute the harmony class from the active chord list */
@@ -114,8 +120,17 @@ static bool find_zone2_key(uint8_t keycode, uint8_t *out_row, uint8_t *out_col)
     return false;
 }
 
-static void handle_zone2_down(jamin_state_t *state, uint8_t row, uint8_t col,
-                              uint8_t modifiers)
+/* Returns the slot index in zone2_map for a keycode, or 0xFF if not found */
+static uint8_t zone2_slot(uint8_t keycode)
+{
+    for (uint8_t i = 0; i < ZONE2_KEY_COUNT; i++) {
+        if (zone2_map[i].keycode == keycode) return i;
+    }
+    return 0xFF;
+}
+
+static void handle_zone2_down(jamin_state_t *state, uint8_t keycode,
+                              uint8_t row, uint8_t col, uint8_t modifiers)
 {
     /* Determine chord type from row + shift modifier */
     chord_type_t type;
@@ -125,6 +140,13 @@ static void handle_zone2_down(jamin_state_t *state, uint8_t row, uint8_t col,
         type = CHORD_MINOR;
     } else {
         type = (modifiers & HID_MOD_LSHIFT) ? CHORD_SUS4 : CHORD_SUS2;
+    }
+
+    /* Persist resolved type so key-up can use it unchanged */
+    uint8_t slot = zone2_slot(keycode);
+    if (slot != 0xFF) {
+        s_held_z2_type[slot]   = type;
+        s_held_z2_active[slot] = true;
     }
 
     /* Determine chromatic root: song_key + diatonic column offset */
@@ -142,26 +164,22 @@ static void handle_zone2_down(jamin_state_t *state, uint8_t row, uint8_t col,
     printf("CHORD ON  root=%d type=%d wav=%d\n", root, (int)type, wav);
 }
 
-static void handle_zone2_up(jamin_state_t *state, uint8_t row, uint8_t col,
-                            uint8_t modifiers)
+static void handle_zone2_up(jamin_state_t *state, uint8_t keycode,
+                            uint8_t col)
 {
-    chord_type_t type;
-    if (row == 0) {
-        type = CHORD_MAJOR;
-    } else if (row == 1) {
-        type = CHORD_MINOR;
-    } else {
-        type = (modifiers & HID_MOD_LSHIFT) ? CHORD_SUS4 : CHORD_SUS2;
-    }
-    uint8_t root = (uint8_t)((state->song_key + DIATONIC_OFFSETS[col]) % 12u);
+    uint8_t slot = zone2_slot(keycode);
+    if (slot == 0xFF || !s_held_z2_active[slot]) return;
 
+    chord_type_t type = s_held_z2_type[slot];
+    s_held_z2_active[slot] = false;
+
+    uint8_t root = (uint8_t)((state->song_key + DIATONIC_OFFSETS[col]) % 12u);
     active_chord_remove(state, root, type);
 
     /* Note: chord loops continue playing after key-up (toggle model).
      * A second key-down on the same key will stop the loop.
      * We do NOT send Note-Off here intentionally.
      */
-    (void)root; /* silence unused-variable warning if printf stripped */
 }
 
 /* ── Zone 3: melody riff trigger ────────────────────────────────────────── */
@@ -265,12 +283,13 @@ static void handle_global_down(jamin_state_t *state, uint8_t keycode,
         return;
     }
 
-    /* BACKSPACE: stop current riff */
+    /* BACKSPACE: stop current riff using a single MIDI All Notes Off (CC 123) */
     if (keycode == HID_KEY_BACKSPACE) {
-        /* Send Note-Off on riff channel for all possible riff notes */
-        for (uint8_t n = 0; n <= MIDI_NOTE_MAX; n++) {
-            midi_note_off(MIDI_CH_RIFF, n);
-        }
+        uint8_t msg[3] = {
+            (uint8_t)(0xB0u | ((MIDI_CH_RIFF - 1u) & 0x0Fu)),
+            123u, 0u
+        };
+        uart_write_blocking(MIDI_UART_ID, msg, 3);
         printf("RIFF STOP\n");
         return;
     }
@@ -286,7 +305,7 @@ void keyboard_key_down(jamin_state_t *state, uint8_t keycode, uint8_t modifiers)
 
     /* Check Zone 2 first */
     if (find_zone2_key(keycode, &row, &col)) {
-        handle_zone2_down(state, row, col, modifiers);
+        handle_zone2_down(state, keycode, row, col, modifiers);
         return;
     }
 
@@ -303,8 +322,9 @@ void keyboard_key_down(jamin_state_t *state, uint8_t keycode, uint8_t modifiers)
 void keyboard_key_up(jamin_state_t *state, uint8_t keycode, uint8_t modifiers)
 {
     uint8_t row, col;
+    (void)modifiers; /* not needed; type was stored at key-down */
     if (find_zone2_key(keycode, &row, &col)) {
-        handle_zone2_up(state, row, col, modifiers);
+        handle_zone2_up(state, keycode, col);
     }
     /* Zone 3 and Zone 1 keys have no key-up action */
 }

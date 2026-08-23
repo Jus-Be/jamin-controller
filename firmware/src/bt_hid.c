@@ -93,14 +93,18 @@ static void process_hid_report(const uint8_t *report, uint16_t len)
 /* ── Persist / load paired address ─────────────────────────────────────── */
 static void save_paired_addr(const bd_addr_t addr)
 {
-    uint8_t buf[8];
+    /* flash_range_program requires the byte count to be a multiple of
+     * FLASH_PAGE_SIZE (256 bytes).  Pad with 0xFF to avoid unnecessary wear. */
+    static uint8_t buf[FLASH_PAGE_SIZE];
+    memset(buf, 0xFF, sizeof(buf));
     memcpy(buf, addr, 6);
     buf[6] = FLASH_MAGIC_HI;
     buf[7] = FLASH_MAGIC_LO;
+
     /* Disable interrupts while programming flash */
     uint32_t ints = save_and_disable_interrupts();
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
-    flash_range_program(FLASH_TARGET_OFFSET, buf, 8);
+    flash_range_program(FLASH_TARGET_OFFSET, buf, FLASH_PAGE_SIZE);
     restore_interrupts(ints);
 }
 
