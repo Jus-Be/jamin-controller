@@ -14,6 +14,14 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+add_executable(jamin_controller
+    src/main.c
+    src/bt_hid.c
+    src/midi.c
+    src/wav_index.c
+    src/keyboard.c
+)
+
 target_include_directories(jamin_controller PRIVATE src)
 
 target_link_libraries(jamin_controller
@@ -26,14 +34,6 @@ target_link_libraries(jamin_controller
     hardware_gpio
     hardware_flash
     hardware_sync
-)
-
-add_executable(jamin_controller
-    src/main.c
-    src/bt_hid.c
-    src/midi.c
-    src/wav_index.c
-    src/keyboard.c
 )
 
 # Enable USB and UART stdio (UART stdio for debug, USB disabled to free resources)
