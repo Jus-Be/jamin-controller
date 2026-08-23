@@ -26,6 +26,8 @@
 #include "bt_hid.h"
 #include "pico/stdlib.h"
 #include "pico/flash.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
 #include "btstack.h"
 #include <string.h>
 #include <stdio.h>
