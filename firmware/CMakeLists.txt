@@ -7,6 +7,11 @@ project(jamin_controller C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# Set Pico Board and Pico Platform
+set(PICO_PLATFORM rp2350-arm-s)
+set(PICO_BOARD pico2_w)
+set(FAMILY rp2040)
+
 pico_sdk_init()
 
 add_executable(jamin_controller
