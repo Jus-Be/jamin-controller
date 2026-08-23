@@ -27,6 +27,8 @@ target_link_libraries(jamin_controller
     pico_cyw43_arch_none
     hardware_uart
     hardware_gpio
+    hardware_flash
+    hardware_sync
 )
 
 # Enable USB and UART stdio (UART stdio for debug, USB disabled to free resources)
