@@ -1,0 +1,16 @@
+# Firmware build outputs
+firmware/build/
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# IDE files
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
