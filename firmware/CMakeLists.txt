@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 
-# Set Pico Board and Pico Platform
+# Set Pico Board and Pico Platform (Correct for Raspberry Pi Pico 2 W)
 set(PICO_PLATFORM rp2350-arm-s)
 set(PICO_BOARD pico2_w)
-set(FAMILY rp2040)
+
+# REMOVED: set(FAMILY rp2040) <- This was conflicting with the RP2350 settings above!
 
 # Pull in Pico SDK (must happen before project())
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -24,6 +25,7 @@ add_executable(jamin_controller
 
 target_include_directories(jamin_controller PRIVATE src)
 
+# Link your libraries (Ensure pico_stdlib is at the top)
 target_link_libraries(jamin_controller
     pico_stdlib
     pico_btstack_classic
@@ -36,7 +38,7 @@ target_link_libraries(jamin_controller
     hardware_sync
 )
 
-# Enable USB and UART stdio (UART stdio for debug, USB disabled to free resources)
+# Enable USB and disable UART stdio
 pico_enable_stdio_usb(jamin_controller 1)
 pico_enable_stdio_uart(jamin_controller 0)
 
