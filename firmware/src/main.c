@@ -6,6 +6,7 @@
  */
 
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 #include "midi.h"
 #include "keyboard.h"
 #include "bt_hid.h"
@@ -32,6 +33,9 @@ int main(void)
 {
     stdio_init_all();
     printf("jamin-controller starting\n");
+	
+	cyw43_arch_init();
+	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
 
     /* Initialise MIDI UART */
     //midi_init();
