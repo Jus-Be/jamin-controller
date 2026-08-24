@@ -37,8 +37,8 @@ target_link_libraries(jamin_controller
 )
 
 # Enable USB and UART stdio (UART stdio for debug, USB disabled to free resources)
-pico_enable_stdio_usb(jamin_controller 0)
-pico_enable_stdio_uart(jamin_controller 1)
+pico_enable_stdio_usb(jamin_controller 1)
+pico_enable_stdio_uart(jamin_controller 0)
 
 # Create map/bin/hex/uf2 output in addition to ELF
 pico_add_extra_outputs(jamin_controller)

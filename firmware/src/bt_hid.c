@@ -39,6 +39,11 @@
 #define read_bootsel_button() false
 #endif
 
+#ifdef CYW43_WL_GPIO_LED_PIN
+#include "pico/cyw43_arch.h"
+#endif
+
+
 /* ── Flash storage for paired address ──────────────────────────────────── */
 /* Store 6-byte BD_ADDR + 2-byte magic in last sector of 2 MB flash */
 #define FLASH_TARGET_OFFSET   (2u * 1024u * 1024u - 4096u)
@@ -85,6 +90,8 @@ static bool led_available(void)
 {
 #ifdef PICO_DEFAULT_LED_PIN
     return true;
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+	return true;
 #else
     return false;
 #endif
@@ -95,6 +102,9 @@ static void led_write(bool on)
 #ifdef PICO_DEFAULT_LED_PIN
     gpio_put(PICO_DEFAULT_LED_PIN, on ? 1 : 0);
     s_led_level = on;
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    // Ask the wifi "driver" to set the GPIO on or off
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on);	
 #else
     (void)on;
 #endif
@@ -359,16 +369,9 @@ void bt_hid_init(bt_hid_key_down_cb_t on_key_down,
 
     memset(s_prev_keycodes, 0, sizeof(s_prev_keycodes));
     btstack_run_loop_set_timer_handler(&s_led_timer, led_timer_handler);
-
-    if (led_available()) {
-#ifdef PICO_DEFAULT_LED_PIN
-        gpio_init(PICO_DEFAULT_LED_PIN);
-        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#endif
-        set_led_mode(LED_MODE_OFF);
-    }
-
+	
     s_force_discovery = read_bootsel_button();
+	
     if (s_force_discovery) {
         printf("BT: BOOTSEL held at boot, discovery mode enabled\n");
     }

@@ -6,6 +6,7 @@
  */
 
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 #include "pico/cyw43_arch.h"
 #include "midi.h"
 #include "keyboard.h"
@@ -32,10 +33,15 @@ static void on_key_up(uint8_t keycode, uint8_t modifiers)
 int main(void)
 {
     stdio_init_all();
+
+    while (!stdio_usb_connected()) {
+        sleep_ms(10);
+    }
+	
     printf("jamin-controller starting\n");
 	
 	cyw43_arch_init();
-	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
+	//cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
 
     /* Initialise MIDI UART */
     //midi_init();
@@ -44,6 +50,8 @@ int main(void)
     /* Initialise keyboard state */
     keyboard_state_init(&g_state);
     printf("Keyboard state ready (project=0, key=C, var=0)\n");
+	
+	sleep_ms(3000);
 
     /* Start Bluetooth HID host – never returns */
     bt_hid_init(on_key_down, on_key_up);
