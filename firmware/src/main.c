@@ -37,19 +37,19 @@ int main(void)
 	cyw43_arch_init();
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
 
-    while (!stdio_usb_connected()) {
+    //while (!stdio_usb_connected()) {
         sleep_ms(10);
-    }
+    //}
 	
-    printf("jamin-controller starting\n");	
+    //printf("jamin-controller starting\n");	
 
     /* Initialise MIDI UART */
     //midi_init();
     //printf("MIDI UART ready\n");
 
     /* Initialise keyboard state */
-    keyboard_state_init(&g_state);
-    printf("Keyboard state ready (project=0, key=C, var=0)\n");
+    //keyboard_state_init(&g_state);
+    //printf("Keyboard state ready (project=0, key=C, var=0)\n");
 	
 	sleep_ms(3000);
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
