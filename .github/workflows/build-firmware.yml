@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. Install standard build tools (EXCLUDING the old compiler)
+      # 1. Install build utilities (excluding the old apt compiler)
       - name: Install build dependencies
         run: |
           sudo apt-get update -y
@@ -33,11 +33,11 @@ jobs:
             git \
             ninja-build
 
-      # 2. Set up a modern ARM toolchain (GCC 13+) required for RP2350
-      - name: Install ARM GNU Toolchain
-        uses: open-cm3/setup-arm-embedded-toolchain@v1
+      # 2. Use a verified action to inject the modern Arm GNU Toolchain
+      - name: Install Arm GNU Toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
-          version: '13.2.Rel1'
+          release: '13.2.Rel1'
 
       - name: Check out Pico SDK
         uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
       - name: Check out BTstack
         run: echo "BTstack is a pico-sdk submodule – already checked out."
 
-      # 3. Explicitly pass PICO_PLATFORM alongside PICO_BOARD to match your chip
+      # 3. Build targeting the RP2350 core
       - name: Configure CMake
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
@@ -78,5 +78,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jamin-controller-firmware
-          path: ${{ steps.outputs.uf2_path || steps.locate_uf2.outputs.uf2_path }}
+          path: ${{ steps.locate_uf2.outputs.uf2_path }}
           if-no-files-found: error
