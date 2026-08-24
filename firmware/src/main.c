@@ -33,15 +33,15 @@ static void on_key_up(uint8_t keycode, uint8_t modifiers)
 int main(void)
 {
     stdio_init_all();
+	
+	cyw43_arch_init();
+	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
 
     while (!stdio_usb_connected()) {
         sleep_ms(10);
     }
 	
-    printf("jamin-controller starting\n");
-	
-	cyw43_arch_init();
-	//cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
+    printf("jamin-controller starting\n");	
 
     /* Initialise MIDI UART */
     //midi_init();
@@ -52,7 +52,8 @@ int main(void)
     printf("Keyboard state ready (project=0, key=C, var=0)\n");
 	
 	sleep_ms(3000);
-
+	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+	
     /* Start Bluetooth HID host – never returns */
     bt_hid_init(on_key_down, on_key_up);
 
