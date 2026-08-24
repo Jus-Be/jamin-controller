@@ -55,7 +55,11 @@ int main(void)
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
     /* Start Bluetooth HID host – never returns */
-    bt_hid_init(on_key_down, on_key_up);
+    //bt_hid_init(on_key_down, on_key_up);
+	
+    while (true) {
+        sleep_ms(10);
+    }	
 
     /* Unreachable */
     return 0;
