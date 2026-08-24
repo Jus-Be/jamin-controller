@@ -289,7 +289,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                     break;
 
                 case HID_SUBEVENT_REPORT: {
-                    uint16_t report_len = hid_subevent_report_get_report_length(packet);
+                    uint16_t report_len = hid_subevent_report_get_report_len(packet);
                     const uint8_t *report_data = hid_subevent_report_get_report(packet);
                     process_hid_report(report_data, report_len);
                     break;
