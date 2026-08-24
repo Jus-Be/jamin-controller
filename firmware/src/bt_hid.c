@@ -147,8 +147,7 @@ static void set_led_mode(led_mode_t mode)
 static void start_discovery(void)
 {
     if (!s_inquiry_active) {
-        printf("BT: starting inquiry
-");
+        printf("BT: starting inquiry");
         gap_inquiry_start(10);
         s_inquiry_active = true;
     }
@@ -277,8 +276,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                         printf("BT: Connected successfully! CID: 0x%04x\n", s_hid_cid);
                         set_led_mode(LED_MODE_ON);
                     } else {
-                        printf("BT: Connection failed (status 0x%02x). Retrying Discovery.\n", 
-                               hid_subevent_connection_opened_get_status(packet));
+                        printf("BT: Connection failed (status 0x%02x). Retrying Discovery.\n", hid_subevent_connection_opened_get_status(packet));
                         s_hid_cid = 0;
                         start_discovery();
                     }
