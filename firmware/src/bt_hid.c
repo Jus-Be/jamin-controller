@@ -133,7 +133,7 @@ static void set_led_mode(led_mode_t mode)
 static void start_discovery(void)
 {
     if (!s_inquiry_active) {
-        printf("BT: starting inquiry");
+        printf("BT: starting inquiry\n");
         gap_inquiry_start(10);
         s_inquiry_active = true;
     }
@@ -203,7 +203,6 @@ static bool load_paired_addr(bd_addr_t addr)
 /* ── Complete BTstack packet handler ────────────────────────────────────── */
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
-	printf("BT: packet_handler\n");
     (void)channel; (void)size;
 
     if (packet_type != HCI_EVENT_PACKET) return;
@@ -229,25 +228,31 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             }
             break;
 
-        case GAP_EVENT_INQUIRY_RESULT: {
-			printf("BT: packet_handler - GAP_EVENT_INQUIRY_RESULT\n");					
-            bd_addr_t addr;
-            gap_event_inquiry_result_get_bd_addr(packet, addr);
-            uint32_t cod = gap_event_inquiry_result_get_class_of_device(packet);
-            
-            /* Major Class 0x0500 Peripheral, Minor Class 0x40 Keyboard = 0x002540 */
-            if ((cod & 0x001F00) == 0x000500 && (cod & 0x0000C0) == 0x000040) {
-                printf("BT: Found Keyboard! Address: %s, COD: 0x%06lx\n", bd_addr_to_str(addr), cod);
-                gap_inquiry_stop();
-                s_inquiry_active = false;
-                
-                memcpy(s_paired_addr, addr, 6);
-                save_paired_addr(s_paired_addr);
-                set_led_mode(LED_MODE_BLINK_SLOW);
-                hid_host_connect(s_paired_addr, HID_PROTOCOL_MODE_BOOT, &s_hid_cid);
-            }
-            break;
-        }
+		case GAP_EVENT_INQUIRY_RESULT:
+			printf("BT: packet_handler - GAP_EVENT_INQUIRY_RESULT\n");                 
+			bd_addr_t addr;
+			gap_event_inquiry_result_get_bd_addr(packet, addr);
+			uint32_t cod = gap_event_inquiry_result_get_class_of_device(packet);
+			
+			// Debug step: See exactly what the NOOX keyboard's COD actually is!
+			printf("BT: Discovered Device! Address: %s, COD: 0x%06lx\n", bd_addr_to_str(addr), cod);
+			
+			/* 
+			 * Major Class 0x0500 = Peripheral
+			 * Minor Class bit 0x40 = Has Keyboard capabilities
+			 */
+			if (((cod & 0x001F00) == 0x000500) && (cod & 0x000040)) {
+				printf("BT: Found Keyboard! Address: %s, COD: 0x%06lx\n", bd_addr_to_str(addr), cod);
+				gap_inquiry_stop();
+				s_inquiry_active = false;
+				
+				memcpy(s_paired_addr, addr, 6);
+				save_paired_addr(s_paired_addr);
+				set_led_mode(LED_MODE_BLINK_SLOW);
+				hid_host_connect(s_paired_addr, HID_PROTOCOL_MODE_BOOT, &s_hid_cid);
+			}
+			break;
+
 
         case GAP_EVENT_INQUIRY_COMPLETE:
 			printf("BT: packet_handler - GAP_EVENT_INQUIRY_COMPLETE\n");				
