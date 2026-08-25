@@ -60,12 +60,10 @@ int main(void)
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
     /* Start Bluetooth HID host – never returns */
-    btstack_memory_init();
-    btstack_run_loop_init(btstack_run_loop_pico_get_instance());
+    pico_btstack_init(cyw43_arch_async_context());
     bt_hid_init(on_key_down, on_key_up);
-    hci_power_control(HCI_POWER_ON); // Power on the radio
-    
-	btstack_run_loop_execute();
+    hci_power_control(HCI_POWER_ON);
+    btstack_run_loop_execute();
 
     /* Unreachable */
     return 0;
