@@ -11,7 +11,6 @@
 #include "pico/btstack_cyw43.h" 
 #include "btstack_memory.h"
 #include "btstack_run_loop.h"
-#include "btstack_run_loop_pico.h"
 #include "hci.h"
 #include "bt_hid.h"
 #include "midi.h"
