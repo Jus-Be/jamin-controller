@@ -326,5 +326,10 @@ void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
     s_force_discovery = true;
 
     btstack_run_loop_set_timer_handler(&s_led_timer, &led_timer_handler);
-    printf("BT: bt_hid_init - btstack_run_loop_set_timer_handler\n");	
+    printf("BT: bt_hid_init - btstack_run_loop_set_timer_handler\n");
+	
+	gap_discoverable_control(1);
+	gap_connectable_control(1);	
+
+	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);	
 }

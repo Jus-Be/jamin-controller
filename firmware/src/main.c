@@ -57,13 +57,14 @@ int main(void)
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
     /* Start Bluetooth HID host – never returns */
+    btstack_memory_init();
+    btstack_run_loop_init(btstack_run_loop_pico_get_instance());
     bt_hid_init(on_key_down, on_key_up);
-
-    while (true) {
-        // This allows background BTstack/CYW43 events to execute correctly 
-        // when using threadsafe_background or poll architectures.
-        cyw43_arch_wait_for_work_until(make_timeout_time_ms(10));
-    }	
+    hci_power_control(HCI_POWER_ON); // Power on the radio
+    
+    // --- RUNLOOP ---
+    btstack_run_loop_execute(); // Replaces while(true)
+    // -------------	
 
     /* Unreachable */
     return 0;
