@@ -1,0 +1,1 @@
+start putty.exe -serial COM4 -sercfg 115200,8,1,n,N
