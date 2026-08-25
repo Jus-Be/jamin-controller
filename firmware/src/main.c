@@ -65,9 +65,7 @@ int main(void)
     bt_hid_init(on_key_down, on_key_up);
     hci_power_control(HCI_POWER_ON); // Power on the radio
     
-    // --- RUNLOOP ---
-    btstack_run_loop_execute(); // Replaces while(true)
-    // -------------	
+	btstack_run_loop_execute();
 
     /* Unreachable */
     return 0;
