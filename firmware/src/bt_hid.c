@@ -235,6 +235,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 			uint32_t cod = gap_event_inquiry_result_get_class_of_device(packet);
 			
 			// Debug step: See exactly what the NOOX keyboard's COD actually is!
+			// BT: Discovered Device! Address: 14:80:CC:CE:50:A1, COD: 0x000100
 			printf("BT: Discovered Device! Address: %s, COD: 0x%06lx\n", bd_addr_to_str(addr), cod);
 			
 			/* 
@@ -334,6 +335,7 @@ void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
 	
 	gap_discoverable_control(1);
 	gap_connectable_control(1);	
+	gap_set_class_of_device(0x200404); 
 
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);	
 }
