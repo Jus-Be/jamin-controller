@@ -220,10 +220,10 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                     uint8_t status = hid_host_connect(s_paired_addr, HID_PROTOCOL_MODE_BOOT, &s_hid_cid);
                     if (status != ERROR_CODE_SUCCESS) {
                         printf("BT: connection initiation failed (0x%02x), forcing discovery.\n", status);
-                        start_discovery();
+                        // start_discovery();
                     }
                 } else {
-                    start_discovery();
+                    // start_discovery();
                 }
             }
             break;
@@ -260,7 +260,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             s_inquiry_active = false;
             if (s_hid_cid == 0) {
                 printf("BT: Inquiry finished. No keyboard matched. Retrying...\n");
-                start_discovery();
+                // start_discovery();
             }
             break;
 
@@ -275,14 +275,14 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                     } else {
                         printf("BT: Connection failed (status 0x%02x). Retrying Discovery.\n", hid_subevent_connection_opened_get_status(packet));
                         s_hid_cid = 0;
-                        start_discovery();
+                        // start_discovery();
                     }
                     break;
 
                 case HID_SUBEVENT_CONNECTION_CLOSED:
                     printf("BT: Disconnected (CID 0x%04x). Re-entering scan.\n", s_hid_cid);
                     s_hid_cid = 0;
-                    start_discovery();
+                    // start_discovery();
                     break;
 
                 case HID_SUBEVENT_REPORT: {
@@ -336,6 +336,8 @@ void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
 	gap_discoverable_control(1);
 	gap_connectable_control(1);	
 	gap_set_class_of_device(0x200404); 
+	gap_inquiry_start(0x08); 
 
-	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);	
+	set_led_mode(LED_MODE_BLINK_FAST);
+	//cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);	
 }
