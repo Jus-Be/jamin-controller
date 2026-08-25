@@ -78,7 +78,6 @@ static void led_write(bool on)  {
 }
 
 static void led_timer_handler(btstack_timer_source_t *ts) {
-	printf("BT: led_timer_handler\n");	
     (void)ts;
 	
     switch (s_led_mode) {
