@@ -51,7 +51,7 @@ int main(void)
     //keyboard_state_init(&g_state);
     //printf("Keyboard state ready (project=0, key=C, var=0)\n");
 	
-	sleep_ms(10000);
+	sleep_ms(5000);
     
 	printf("Readsy for debugging\n");	
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);

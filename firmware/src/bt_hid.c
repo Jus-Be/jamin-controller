@@ -69,34 +69,18 @@ static uint8_t hid_descriptor_storage[600]; // Buffer to store the keyboard's HI
 #define LED_BLINK_SLOW_MS 500
 #define LED_BLINK_FAST_MS 150
 
-static bool led_available(void)
-{
-#ifdef PICO_DEFAULT_LED_PIN
+static bool led_available(void) {
     return true;
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    return true;
-#else
-    return false;
-#endif
 }
 
-static void led_write(bool on)
-{
-#ifdef PICO_DEFAULT_LED_PIN
-    gpio_put(PICO_DEFAULT_LED_PIN, on ? 1 : 0);
-    s_led_level = on;
-#elif defined(CYW43_WL_GPIO_LED_PIN)
+static void led_write(bool on)  {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on);	
-#else
-    (void)on;
-#endif
 }
 
-static void led_timer_handler(btstack_timer_source_t *ts)
-{
+static void led_timer_handler(btstack_timer_source_t *ts) {
+	printf("BT: led_timer_handler\n");	
     (void)ts;
-    if (!led_available()) return;
-
+	
     switch (s_led_mode) {
         case LED_MODE_BLINK_SLOW:
             led_write(!s_led_level);
