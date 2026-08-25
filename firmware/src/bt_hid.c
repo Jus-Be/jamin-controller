@@ -7,6 +7,7 @@
 
 #include "bt_hid.h"
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 #include "pico/flash.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
@@ -32,7 +33,7 @@
 
 static bd_addr_t s_paired_addr;
 static bool      s_has_paired_addr = false;
-static bool      s_force_discovery = false;
+static bool      s_force_discovery = true;
 static bool      s_inquiry_active  = false;
 
 /* ── Callback pointers ──────────────────────────────────────────────────── */
@@ -219,6 +220,7 @@ static bool load_paired_addr(bd_addr_t addr)
 /* ── Complete BTstack packet handler ────────────────────────────────────── */
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
+	printf("BT: packet_handler\n");
     (void)channel; (void)size;
 
     if (packet_type != HCI_EVENT_PACKET) return;
@@ -227,6 +229,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
     
     switch (event_type) {
         case BTSTACK_EVENT_STATE:
+			printf("BT: packet_handler - BTSTACK_EVENT_STATE\n");		
             if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
                 printf("BT: stack working\n");
                 if (s_has_paired_addr && !s_force_discovery) {
@@ -244,6 +247,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             break;
 
         case GAP_EVENT_INQUIRY_RESULT: {
+			printf("BT: packet_handler - GAP_EVENT_INQUIRY_RESULT\n");					
             bd_addr_t addr;
             gap_event_inquiry_result_get_bd_addr(packet, addr);
             uint32_t cod = gap_event_inquiry_result_get_class_of_device(packet);
@@ -263,6 +267,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
         }
 
         case GAP_EVENT_INQUIRY_COMPLETE:
+			printf("BT: packet_handler - GAP_EVENT_INQUIRY_COMPLETE\n");				
             s_inquiry_active = false;
             if (s_hid_cid == 0) {
                 printf("BT: Inquiry finished. No keyboard matched. Retrying...\n");
@@ -271,6 +276,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             break;
 
         case HCI_EVENT_HID_META:
+			printf("BT: packet_handler - HCI_EVENT_HID_META\n");				
             switch (hci_event_hid_meta_get_subevent_code(packet)) {
                 case HID_SUBEVENT_CONNECTION_OPENED:
                     if (hid_subevent_connection_opened_get_status(packet) == ERROR_CODE_SUCCESS) {

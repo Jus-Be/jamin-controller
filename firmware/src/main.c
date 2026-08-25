@@ -38,7 +38,7 @@ int main(void)
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);		
 
     //while (!stdio_usb_connected()) {
-        sleep_ms(10);
+        //sleep_ms(10);
     //}
 	
     //printf("jamin-controller starting\n");	
@@ -53,7 +53,7 @@ int main(void)
 	
 	sleep_ms(10000);
     
-	printf("Readsy for debugging");	
+	printf("Readsy for debugging\n");	
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
     /* Start Bluetooth HID host – never returns */
