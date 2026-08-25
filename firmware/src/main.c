@@ -8,13 +8,9 @@
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "pico/cyw43_arch.h"
-#include "pico/btstack_cyw43.h" 
-#include "btstack_memory.h"
-#include "btstack_run_loop.h"
-#include "hci.h"
-#include "bt_hid.h"
 #include "midi.h"
 #include "keyboard.h"
+#include "bt_hid.h"
 #include <stdio.h>
 
 /* Global application state */
@@ -60,13 +56,15 @@ int main(void)
 	printf("Readsy for debugging\n");	
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
-    btstack_memory_init();
-    const btstack_run_loop_t * loop = btstack_run_loop_pico_get_instance();
-    btstack_run_loop_init(loop);
+    /* Start Bluetooth HID host – never returns */
     bt_hid_init(on_key_down, on_key_up);
-    hci_power_control(HCI_POWER_ON);
+	hci_power_control(HCI_POWER_ON);
 
-    btstack_run_loop_execute();
+    while (true) {
+        // This allows background BTstack/CYW43 events to execute correctly 
+        // when using threadsafe_background or poll architectures.
+        cyw43_arch_wait_for_work_until(make_timeout_time_ms(10));
+    }	
 
     /* Unreachable */
     return 0;
