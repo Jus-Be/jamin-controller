@@ -63,6 +63,8 @@ static led_mode_t s_led_mode = LED_MODE_OFF;
 static bool       s_led_mode_ready = false;
 static bool       s_led_level = false;
 
+static uint8_t hid_descriptor_storage[600]; // Buffer to store the keyboard's HID descriptor
+
 #define LED_BLINK_SLOW_MS 500
 #define LED_BLINK_FAST_MS 150
 
@@ -304,11 +306,26 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
     }
 }
 
-/* ── External Initialization Hook ─────────────────────────────────────── */
 void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
     s_on_key_down = on_down;
     s_on_key_up = on_up;
 
+    // 1. Initialize core BTstack dependencies required for Classic HID Host
+    l2cap_init();
+    
+    #ifdef ENABLE_SEGURE_CONNECTIONS
+    sm_init(); // Crucial for pairing exchange layers
+    #endif
+
+    // 2. Initialize the HID Host Subsystem with descriptor cache
+    hid_host_init(hid_descriptor_storage, sizeof(hid_descriptor_storage));
+
+    // 3. Register your event callbacks
+    s_hci_event_cb_reg.callback = &packet_handler;
+    hci_add_event_handler(&s_hci_event_cb_reg);
+    hid_host_register_packet_handler(&packet_handler);
+
+    // 4. Handle paired addresses and flash overrides
     s_has_paired_addr = load_paired_addr(s_paired_addr);
     if (read_bootsel_button()) {
         printf("BT: BOOTSEL held down. Forcing clean pairing discovery...\n");
@@ -316,8 +333,4 @@ void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
     }
 
     btstack_run_loop_set_timer_handler(&s_led_timer, &led_timer_handler);
-
-    s_hci_event_cb_reg.callback = &packet_handler;
-    hci_add_event_handler(&s_hci_event_cb_reg);
-    hid_host_register_packet_handler(&packet_handler);
 }

@@ -56,9 +56,11 @@ int main(void)
 	
     /* Start Bluetooth HID host – never returns */
     bt_hid_init(on_key_down, on_key_up);
-	
+
     while (true) {
-        sleep_ms(10);
+        // This allows background BTstack/CYW43 events to execute correctly 
+        // when using threadsafe_background or poll architectures.
+        cyw43_arch_wait_for_work_until(make_timeout_time_ms(10));
     }	
 
     /* Unreachable */
