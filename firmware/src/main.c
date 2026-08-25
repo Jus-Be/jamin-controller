@@ -51,7 +51,9 @@ int main(void)
     //keyboard_state_init(&g_state);
     //printf("Keyboard state ready (project=0, key=C, var=0)\n");
 	
-	sleep_ms(3000);
+	sleep_ms(10000);
+    
+	printf("Readsy for debugging");	
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
 	
     /* Start Bluetooth HID host – never returns */

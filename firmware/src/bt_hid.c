@@ -307,6 +307,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 }
 
 void bt_hid_init(bt_hid_key_down_cb_t on_down, bt_hid_key_up_cb_t on_up) {
+    printf("BT: bt_hid_init\n");	
     s_on_key_down = on_down;
     s_on_key_up = on_up;
 
