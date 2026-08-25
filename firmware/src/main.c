@@ -8,6 +8,7 @@
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "pico/cyw43_arch.h"
+#include "pico/btstack_cyw43.h" 
 #include "btstack_memory.h"
 #include "btstack_run_loop.h"
 #include "hci.h"
