@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3x7 Chord Matrix MIDI Controller Sandbox</title>
+    <style>
+        :root {
+            --bg-dark: #121214;
+            --panel-bg: #1e1e24;
+            --key-inactive: #2d2d38;
+            --chord-active: #2563eb;
+            --anchor-color: #3b82f6;
+            --safe-color: #10b981;
+            --tension-color: #ef4444;
+            --text-light: #f4f4f5;
+            --perc-color: #eab308;
+            --sus-color: #a855f7;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-size: 1.8rem; }
+
+        .dashboard {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .telemetry-panel {
+            background-color: var(--panel-bg);
+            padding: 15px 20px;
+            border-radius: 8px;
+            flex: 1;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-top: 4px solid var(--chord-active);
+        }
+
+        .telemetry-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #a1a1aa;
+        }
+
+        .telemetry-data {
+            font-size: 1.3rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .status-bar { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 15px; }
+
+        .keyboard-console {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 1200px;
+            box-sizing: border-box;
+        }
+
+        .split-layout { display: flex; gap: 50px; width: 100%; }
+        .matrix-container { display: flex; flex-direction: column; gap: 10px; }
+        .matrix-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #a1a1aa; margin-bottom: 5px; font-weight: bold; }
+        .keyboard-row { display: flex; gap: 8px; }
+
+        .key-cap {
+            width: 54px;
+            height: 54px;
+            background-color: var(--key-inactive);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 6px;
+            box-sizing: border-box;
+            font-size: 0.75rem;
+            font-weight: bold;
+            transition: all 0.08s ease;
+            user-select: none;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .key-cap .label { color: #a1a1aa; text-transform: uppercase; }
+        .key-cap .output-note { align-self: flex-end; font-size: 0.85rem; font-family: monospace; }
+
+        .row-percussion .key-cap { border-bottom: 4px solid var(--perc-color); }
+        .row-percussion .key-cap.active { background-color: var(--perc-color); color: #000; transform: scale(0.96); }
+        .row-percussion .key-cap.active .label, .row-percussion .key-cap.active .output-note { color: #000; }
+
+        .key-cap.chord-trigger.active {
+            background-color: var(--chord-active);
+            box-shadow: 0 0 12px var(--chord-active);
+            transform: scale(0.96);
+            color: white;
+        }
+        .key-cap.chord-trigger.active .label { color: white; }
+
+        .row-anchors .key-cap { border-left: 4px solid var(--anchor-color); }
+        .row-safes .key-cap { border-left: 4px solid var(--safe-color); }
+        .row-tensions .key-cap { border-left: 4px solid var(--tension-color); }
+
+        .row-anchors .key-cap.active { background-color: var(--anchor-color); color: white; transform: scale(0.96); }
+        .row-safes .key-cap.active { background-color: var(--safe-color); color: white; transform: scale(0.96); }
+        .row-tensions .key-cap.active { background-color: var(--tension-color); color: white; transform: scale(0.96); }
+        .row-anchors .key-cap.active .label, .row-safes .key-cap.active .label, .row-tensions .key-cap.active .label { color: white; }
+
+        .focus-notice { margin-top: 20px; font-size: 0.9rem; color: #f59e0b; background: rgba(245, 158, 11, 0.1); padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .latched-alert { color: var(--tension-color); font-size: 0.75rem; display: block; }
+        
+        .sustain-active {
+            color: var(--sus-color) !important;
+            text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>QWERTY MIDI Performance Matrix</h1>
+    <div class="status-bar" id="midi-status">Checking Web MIDI Framework...</div>
+
+    <div class="dashboard">
+        <div class="telemetry-panel">
+            <h3>Active Chord (Ch 1)</h3>
+            <div class="telemetry-data" id="display-chord">NONE</div>
+        </div>
+        <div class="telemetry-panel" style="border-top-color: var(--safe-color);">
+            <h3>Melody Out (Ch 2)</h3>
+            <div class="telemetry-data" id="display-melody">-</div>
+        </div>
+        <div class="telemetry-panel" style="border-top-color: var(--perc-color);">
+            <h3>Tuning & Modifiers</h3>
+            <div class="telemetry-data" id="display-tuning">Key: C (Offset: 0)</div>
+        </div>
+        <div class="telemetry-panel" style="border-top-color: var(--sus-color);">
+            <h3>Performance Dynamics</h3>
+            <div class="telemetry-data">
+                <span id="display-velocity">-</span>
+                <span id="display-sustain" style="margin-left: 15px; color: #a1a1aa;">[SUS: OFF]</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="keyboard-console">
+        <div class="matrix-container row-percussion">
+            <div class="matrix-title">Percussion Controller Array (MIDI Channel 10 | Offset: 32 + Key Value)</div>
+            <div class="keyboard-row">
+                <div class="key-cap" id="key-1"><span class="label">1</span><span class="output-note">33</span></div>
+                <div class="key-cap" id="key-2"><span class="label">2</span><span class="output-note">34</span></div>
+                <div class="key-cap" id="key-3"><span class="label">3</span><span class="output-note">35</span></div>
+                <div class="key-cap" id="key-4"><span class="label">4</span><span class="output-note">36</span></div>
+                <div class="key-cap" id="key-5"><span class="label">5</span><span class="output-note">37</span></div>
+                <div class="key-cap" id="key-6"><span class="label">6</span><span class="output-note">38</span></div>
+                <div class="key-cap" id="key-7"><span class="label">7</span><span class="output-note">39</span></div>
+                <div class="key-cap" id="key-8"><span class="label">8</span><span class="output-note">40</span></div>
+                <div class="key-cap" id="key-9"><span class="label">9</span><span class="output-note">41</span></div>
+                <div class="key-cap" id="key-0"><span class="label">0</span><span class="output-note">42</span></div>
+            </div>
+        </div>
+
+        <div class="split-layout">
+            <div class="matrix-container">
+                <div class="matrix-title">Left Hand: 21 Chord Selection Matrix</div>
+                <div class="keyboard-row">
+                    <div class="key-cap chord-trigger" id="key-q"><span class="label">Q</span><span class="output-note">C</span></div>
+                    <div class="key-cap chord-trigger" id="key-w"><span class="label">W</span><span class="output-note">D</span></div>
+                    <div class="key-cap chord-trigger" id="key-e"><span class="label">E</span><span class="output-note">E</span></div>
+                    <div class="key-cap chord-trigger" id="key-r"><span class="label">R</span><span class="output-note">F</span></div>
+                    <div class="key-cap chord-trigger" id="key-t"><span class="label">T</span><span class="output-note">G</span></div>
+                    <div class="key-cap chord-trigger" id="key-y"><span class="label">Y</span><span class="output-note">A</span></div>
+                    <div class="key-cap chord-trigger" id="key-u"><span class="label">U</span><span class="output-note">B</span></div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key-cap chord-trigger" id="key-a"><span class="label">A</span><span class="output-note">Cm</span></div>
+                    <div class="key-cap chord-trigger" id="key-s"><span class="label">S</span><span class="output-note">Dm</span></div>
+                    <div class="key-cap chord-trigger" id="key-d"><span class="label">D</span><span class="output-note">Em</span></div>
+                    <div class="key-cap chord-trigger" id="key-f"><span class="label">F</span><span class="output-note">Fm</span></div>
+                    <div class="key-cap chord-trigger" id="key-g"><span class="label">G</span><span class="output-note">Gm</span></div>
+                    <div class="key-cap chord-trigger" id="key-h"><span class="label">H</span><span class="output-note">Am</span></div>
+                    <div class="key-cap chord-trigger" id="key-j"><span class="label">J</span><span class="output-note">Bm</span></div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key-cap chord-trigger" id="key-backslash"><span class="label">\</span><span class="output-note">Csus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-z"><span class="label">Z</span><span class="output-note">Dsus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-x"><span class="label">X</span><span class="output-note">Esus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-c"><span class="label">C</span><span class="output-note">Fsus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-v"><span class="label">V</span><span class="output-note">Gsus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-b"><span class="label">B</span><span class="output-note">Asus4</span></div>
+                    <div class="key-cap chord-trigger" id="key-n"><span class="label">N</span><span class="output-note">Bsus4</span></div>
+                </div>
+            </div>
+
+            <div class="matrix-container">
+                <div class="matrix-title">Right Hand: Dynamic Harmony Matrix</div>
+                <div class="keyboard-row row-anchors">
+                    <div class="key-cap melody-trigger" id="key-o"><span class="label">O</span><span class="output-note" id="note-o">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-p"><span class="label">P</span><span class="output-note" id="note-p">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-["><span class="label">[</span><span class="output-note" id="note-[">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-]"><span class="label">]</span><span class="output-note" id="note-]">-</span></div>
+                </div>
+                <div class="keyboard-row row-safes">
+                    <div class="key-cap melody-trigger" id="key-l"><span class="label">L</span><span class="output-note" id="note-l">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-;"><span class="label">;</span><span class="output-note" id="note-;">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-'"><span class="label">'</span><span class="output-note" id="note-'">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-#"><span class="label">#</span><span class="output-note" id="note-#">-</span></div>
+                </div>
+                <div class="keyboard-row row-tensions">
+                    <div class="key-cap melody-trigger" id="key-m"><span class="label">M</span><span class="output-note" id="note-m">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-,"><span class="label">,</span><span class="output-note" id="note-,-">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-."><span class="label">.</span><span class="output-note" id="note-.">-</span></div>
+                    <div class="key-cap melody-trigger" id="key-/"><span class="label">/</span><span class="output-note" id="note-/">-</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="focus-notice">👉 Click anywhere inside this window to focus control input. Tuning keys: [ + ] Transpose Up | [ - ] Transpose Down | [ Shift / CapsLock ] Passive Flatten | [ Spacebar ] Sustain</div>
+
+    <script>
+        const SCALE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        function getNoteName(midiNum) {
+            return SCALE_NAMES[midiNum % 12] + (Math.floor(midiNum / 12) - 1);
+        }
+
+        class QwertyMidiController {
+            constructor(midiOutput) {
+                this.output = midiOutput;
+                this.chordChannel = 0;   
+                this.melodyChannel = 1;  
+                this.loopChannel = 2;    // MIDI Ch 3 for Audio Loops
+                this.percChannel = 9;    
+
+                this.globalTransposeOffset = 0;
+                this.currentChordKey = null;
+                this.activeMidiNotes = new Map(); 
+                
+                // Modifiers state object
+                this.modifiers = {
+                    flatten: false,
+                    inv1: false,  // Home
+                    inv2: false,  // End
+                    inv3: false,  // PageUp
+                    seventh: false // PageDown
+                };
+
+                this.rightHandLayout = {
+                    'o': { row: 'anchors', index: 0, vel: 110 }, 'p': { row: 'anchors', index: 1, vel: 110 }, 
+                    '[': { row: 'anchors', index: 2, vel: 110 }, ']': { row: 'anchors', index: 3, vel: 110 },
+                    'l': { row: 'safes', index: 0, vel: 90 },   ';': { row: 'safes', index: 1, vel: 90 }, 
+                    "'": { row: 'safes', index: 2, vel: 90 },   '#': { row: 'safes', index: 3, vel: 90 },
+                    'm': { row: 'tensions', index: 0, vel: 65 }, ',': { row: 'tensions', index: 1, vel: 65 }, 
+                    '.': { row: 'tensions', index: 2, vel: 65 }, '/': { row: 'tensions', index: 3, vel: 65 }
+                };
+
+                this.chordMap = {
+                    "q": { baseCC: 20, name: "C Major", anchors: [60,64,67,72], safes: [62,65,69,71], tensions: [61,63,66,68,70] },
+                    "w": { baseCC: 21, name: "D Major", anchors: [62,66,69,74], safes: [60,64,65,67,71], tensions: [61,63,68,70,72,73] },
+                    "e": { baseCC: 22, name: "E Major", anchors: [64,68,71,76], safes: [60,62,65,67,69], tensions: [61,63,66,70,72,74,75] },
+                    "r": { baseCC: 23, name: "F Major", anchors: [65,69,72,77], safes: [60,62,64,67,71], tensions: [61,63,66,68,70,73,74,76] },
+                    "t": { baseCC: 24, name: "G Major", anchors: [67,71,74,79], safes: [60,64,65,69], tensions: [61,62,63,66,68,70,72,73,75,76,77,78] },
+                    "y": { baseCC: 25, name: "A Major", anchors: [69,73,76,81], safes: [60,62,64,65,67,71], tensions: [61,63,66,68,70,72,74,75,77,78,80] },
+                    "u": { baseCC: 26, name: "B Major", anchors: [71,75,78,83], safes: [60,62,64,65,67,69], tensions: [61,63,66,68,70,72,73,74,76,77,79,80,81,82] },
+
+                    "a": { baseCC: 27, name: "C Minor", anchors: [60,63,67,72], safes: [62,65,69,71], tensions: [61,64,66,68,70] },
+                    "s": { baseCC: 28, name: "D Minor", anchors: [62,65,69,74], safes: [60,64,67,71], tensions: [61,63,66,68,70,72,73] },
+                    "d": { baseCC: 29, name: "E Minor", anchors: [64,67,71,76], safes: [60,62,65,69], tensions: [61,63,66,68,70,72,74,75] },
+                    "f": { baseCC: 30, name: "F Minor", anchors: [65,68,72,77], safes: [60,62,64,67,69,71], tensions: [61,63,66,70,73,74,76] },
+                    "g": { baseCC: 31, name: "G Minor", anchors: [67,70,74,79], safes: [60,62,64,65,69,71], tensions: [61,63,66,68,72,73,75,76,77,78] },
+                    "h": { baseCC: 32, name: "A Minor", anchors: [57,60,64,69], safes: [59,62,65,67,71], tensions: [58,61,63,66,68,70] },
+                    "j": { baseCC: 33, name: "B Minor", anchors: [59,62,66,71], safes: [60,64,67,69], tensions: [61,63,65,68,70,72,73,74,75] },
+
+                    "\\": { baseCC: 34, name: "C Sus4", anchors: [60,65,67,72], safes: [62,69,71], tensions: [61,63,64,66,68,70] },
+                    "z": { baseCC: 35, name: "D Sus4", anchors: [62,67,69,74], safes: [60,64,71], tensions: [61,63,65,66,68,70,72,73] },
+                    "x": { baseCC: 36, name: "E Sus4", anchors: [64,69,71,76], safes: [60,62,65,67], tensions: [61,63,66,68,70,72,74,75] },
+                    "c": { baseCC: 37, name: "F Sus4", anchors: [65,70,72,77], safes: [60,62,64,67,69,71], tensions: [61,63,66,68,73,74,76] },
+                    "v": { baseCC: 38, name: "G Sus4", anchors: [67,72,74,79], safes: [60,62,64,65,69,71], tensions: [61,63,66,68,70,73,75,76,77,78] },
+                    "b": { baseCC: 39, name: "A Sus4", anchors: [57,62,64,69], safes: [59,65,67,71], tensions: [58,60,61,63,66,68,70] },
+                    "n": { baseCC: 40, name: "B Sus4", anchors: [59,64,66,71], safes: [60,62,67,69], tensions: [61,63,65,68,70,72,73,74,75] }
+                };
+
+                this.initEventListeners();
+            }
+
+            getFlattenModifier() { return this.modifiers.flatten ? -1 : 0; }
+            getEffectiveTranspose() { return this.globalTransposeOffset + this.getFlattenModifier(); }
+            humanizeVelocity(baseVel) {
+                const variance = Math.floor(Math.random() * 11) - 5; 
+                return Math.max(1, Math.min(127, baseVel + variance));
+            }
+
+            // Calculate the exact shape index based on the request rules
+            calculateShapeIndex() {
+                if (!this.currentChordKey) return 0;
+                const baseCC = this.chordMap[this.currentChordKey].baseCC;
+                let flatOffset = this.modifiers.flatten ? 21 : 0;
+                let invOffset = 0;
+                if (this.modifiers.inv1) invOffset = 42;
+                else if (this.modifiers.inv2) invOffset = 63;
+                else if (this.modifiers.inv3) invOffset = 84;
+                let sevOffset = this.modifiers.seventh ? 105 : 0;
+                return baseCC + flatOffset + invOffset + sevOffset;
+            }
+
+            // Apply inversion shifts dynamically onto pitch sets
+            modifyPitches(notesArray) {
+                let resultingNotes = [...notesArray];
+                if (this.modifiers.inv1 && resultingNotes.length >= 1) {
+                    resultingNotes[0] += 12;
+                } else if (this.modifiers.inv2 && resultingNotes.length >= 2) {
+                    resultingNotes[0] += 12;
+                    resultingNotes[1] += 12;
+                } else if (this.modifiers.inv3 && resultingNotes.length >= 3) {
+                    resultingNotes[0] += 12;
+                    resultingNotes[1] += 12;
+                    resultingNotes[2] += 12;
+                }
+                if (this.modifiers.seventh) {
+                    resultingNotes = resultingNotes.map(n => n + 10);
+                }
+                return resultingNotes;
+            }
+
+            initEventListeners() {
+                window.addEventListener('keydown', (e) => {
+                    // Detect changes in passive modifier keys dynamically
+                    let modChanged = false;
+                    const oldFlatten = this.modifiers.flatten;
+                    this.modifiers.flatten = e.shiftKey || e.getModifierState('CapsLock');
+                    if (oldFlatten !== this.modifiers.flatten) modChanged = true;
+
+                    if (e.key === 'Home') { e.preventDefault(); if(!this.modifiers.inv1) { this.modifiers.inv1 = true; this.modifiers.inv2 = false; this.modifiers.inv3 = false; modChanged = true; } }
+                    if (e.key === 'End') { e.preventDefault(); if(!this.modifiers.inv2) { this.modifiers.inv1 = false; this.modifiers.inv2 = true; this.modifiers.inv3 = false; modChanged = true; } }
+                    if (e.key === 'PageUp') { e.preventDefault(); if(!this.modifiers.inv3) { this.modifiers.inv1 = false; this.modifiers.inv2 = false; this.modifiers.inv3 = true; modChanged = true; } }
+                    if (e.key === 'PageDown') { e.preventDefault(); if(!this.modifiers.seventh) { this.modifiers.seventh = true; modChanged = true; } }
+
+                    if (modChanged) {
+                        this.updateTuningUI();
+                        if (this.currentChordKey) {
+                            this.refreshActiveChordPitch();
+                            this.refreshRightHandNotes();
+                            this.updateRightHandLabels();
+                            this.sendLoopChangePacket();
+                        }
+                    }
+
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (e.repeat) return;
+                        this.sendControlChange(this.chordChannel, 64, 127);
+                        this.sendControlChange(this.melodyChannel, 64, 127);
+                        const susEl = document.getElementById('display-sustain');
+                        if (susEl) { susEl.innerText = "[SUS: ON]"; susEl.classList.add('sustain-active'); }
+                        return;
+                    }
+
+                    if (e.repeat) return;
+                    let key = e.key.toLowerCase();
+
+                    if (key === '+' || e.key === '=') {
+                        this.globalTransposeOffset++;
+                        this.updateTuningUI();
+                        if (this.currentChordKey) {
+                            this.refreshActiveChordPitch();
+                            this.refreshRightHandNotes();
+                            this.updateRightHandLabels();
+                        }
+                        return;
+                    }
+                    if (key === '-') {
+                        this.globalTransposeOffset--;
+                        this.updateTuningUI();
+                        if (this.currentChordKey) {
+                            this.refreshActiveChordPitch();
+                            this.refreshRightHandNotes();
+                            this.updateRightHandLabels();
+                        }
+                        return;
+                    }
+
+                    if ("1234567890".includes(key)) {
+                        let val = parseInt(key); if (val === 0) val = 10;
+                        const percMidiNote = 32 + val;
+                        const finalVel = this.humanizeVelocity(100);
+                        
+                        this.sendMidi(0x90, this.percChannel, percMidiNote, finalVel);
+                        document.getElementById(`key-${e.key}`)?.classList.add('active');
+                        document.getElementById('display-velocity').innerText = `Perc: ${finalVel}`;
+                        return;
+                    }
+
+                    // CHORD TRIGGER LOGIC - TOGGLE ACTION (Q to N)
+                    if (this.chordMap[key]) {
+                        if (this.currentChordKey === key) {
+                            // Secondary strike turns toggle off cleanly
+                            this.stopCurrentChord();
+                            this.sendLoopStopPacket();
+                            const elementId = key === '\\' ? 'key-backslash' : `key-${key}`;
+                            document.getElementById(elementId)?.classList.remove('active');
+                            this.currentChordKey = null;
+                            document.getElementById('display-chord').innerText = "NONE";
+                            this.clearRightHandLabels();
+                        } else {
+                            // Turn off old active chord toggle completely first
+                            if (this.currentChordKey) {
+                                this.stopCurrentChord();
+                                const oldId = this.currentChordKey === '\\' ? 'key-backslash' : `key-${this.currentChordKey}`;
+                                document.getElementById(oldId)?.classList.remove('active');
+                            }
+                            
+                            this.currentChordKey = key;
+                            const elementId = key === '\\' ? 'key-backslash' : `key-${key}`;
+                            document.getElementById(elementId)?.classList.add('active');
+                            
+                            this.playActiveChordTriad();
+                            this.updateRightHandLabels();
+                            this.refreshRightHandNotes();
+                            this.sendLoopChangePacket();
+                        }
+                    }
+
+                    // RIGHT HAND HARMONIC MELODY GRID
+                    if (this.rightHandLayout[key] && this.currentChordKey) {
+                        const layout = this.rightHandLayout[key];
+                        const activeProfile = this.chordMap[this.currentChordKey];
+                        
+                        // Pass notes safely through runtime modifiers
+                        const baseNotes = this.modifyPitches(activeProfile[layout.row]);
+                        const baseNote = baseNotes[layout.index % baseNotes.length];
+                        
+                        const finalMidiNote = baseNote + this.getEffectiveTranspose();
+                        const finalVel = this.humanizeVelocity(layout.vel);
+
+                        this.sendMidi(0x90, this.melodyChannel, finalMidiNote, finalVel);
+                        this.activeMidiNotes.set(key, baseNote); 
+                        
+                        document.getElementById(`key-${key}`)?.classList.add('active');
+                        document.getElementById('display-melody').innerText = getNoteName(finalMidiNote);
+                        document.getElementById('display-velocity').innerText = `Melody: ${finalVel}`;
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    let modChanged = false;
+                    const oldFlatten = this.modifiers.flatten;
+                    this.modifiers.flatten = e.shiftKey || e.getModifierState('CapsLock');
+                    if (oldFlatten !== this.modifiers.flatten) modChanged = true;
+
+                    if (e.key === 'Home') { this.modifiers.inv1 = false; modChanged = true; }
+                    if (e.key === 'End') { this.modifiers.inv2 = false; modChanged = true; }
+                    if (e.key === 'PageUp') { this.modifiers.inv3 = false; modChanged = true; }
+                    if (e.key === 'PageDown') { this.modifiers.seventh = false; modChanged = true; }
+
+                    if (modChanged) {
+                        this.updateTuningUI();
+                        if (this.currentChordKey) {
+                            this.refreshActiveChordPitch();
+                            this.refreshRightHandNotes();
+                            this.updateRightHandLabels();
+                            this.sendLoopChangePacket();
+                        }
+                    }
+
+                    if (e.code === 'Space') {
+                        this.sendControlChange(this.chordChannel, 64, 0);
+                        this.sendControlChange(this.melodyChannel, 64, 0);
+                        const susEl = document.getElementById('display-sustain');
+                        if (susEl) { susEl.innerText = "[SUS: OFF]"; susEl.classList.remove('sustain-active'); }
+                        return;
+                    }
+
+                    let key = e.key.toLowerCase();
+
+                    if ("1234567890".includes(key)) {
+                        let val = parseInt(key); if (val === 0) val = 10;
+                        this.sendMidi(0x80, this.percChannel, 32 + val, 0);
+                        document.getElementById(`key-${e.key}`)?.classList.remove('active');
+                        return;
+                    }
+
+                    if (this.activeMidiNotes.has(key)) {
+                        const baseNote = this.activeMidiNotes.get(key);
+                        const finalMidiNote = baseNote + this.getEffectiveTranspose();
+                        this.sendMidi(0x80, this.melodyChannel, finalMidiNote, 0);
+                        this.activeMidiNotes.delete(key);
+                        document.getElementById(`key-${key}`)?.classList.remove('active');
+                    }
+                });
+            }
+
+            playActiveChordTriad() {
+                if (!this.currentChordKey) return;
+                const profile = this.chordMap[this.currentChordKey];
+                
+                // Formulate target chords from formula profile definitions
+                const modifiedBaseNotes = this.modifyPitches(profile.anchors.slice(0, 3));
+                
+                let displayString = profile.name;
+                if (this.modifiers.flatten) displayString += " ♭";
+                if (this.modifiers.inv1) displayString += " (1st Inv)";
+                if (this.modifiers.inv2) displayString += " (2nd Inv)";
+                if (this.modifiers.inv3) displayString += " (3rd Inv)";
+                if (this.modifiers.seventh) displayString += " (+7th)";
+                document.getElementById('display-chord').innerText = displayString;
+
+                const chordVel = this.humanizeVelocity(80);
+                document.getElementById('display-velocity').innerText = `Chord: ${chordVel}`;
+
+                modifiedBaseNotes.forEach(n => {
+                    this.sendMidi(0x90, this.chordChannel, n + this.getEffectiveTranspose(), chordVel);
+                });
+            }
+
+            stopCurrentChord() {
+                if (!this.currentChordKey) return;
+                const profile = this.chordMap[this.currentChordKey];
+                const modifiedBaseNotes = this.modifyPitches(profile.anchors.slice(0, 3));
+                modifiedBaseNotes.forEach(n => {
+                    this.sendMidi(0x80, this.chordChannel, n + this.getEffectiveTranspose(), 0);
+                });
+            }
+
+            refreshActiveChordPitch() {
+                if (!this.currentChordKey) return;
+                // Kill active voices before updating to fresh modifications
+                const profile = this.chordMap[this.currentChordKey];
+                
+                // This cleans out note trails explicitly across all possible modifier iterations
+                for(let i=40; i<=100; i++) {
+                    this.sendMidi(0x80, this.chordChannel, i, 0);
+                }
+                this.playActiveChordTriad();
+            }
+
+            refreshRightHandNotes() {
+                if (!this.currentChordKey) return;
+                for (let [key, baseNote] of this.activeMidiNotes.entries()) {
+                    const layout = this.rightHandLayout[key];
+                    const activeProfile = this.chordMap[this.currentChordKey];
+                    
+                    this.sendMidi(0x80, this.melodyChannel, baseNote + this.getEffectiveTranspose(), 0);
+                    
+                    const baseNotesMod = this.modifyPitches(activeProfile[layout.row]);
+                    const updatedBaseNote = baseNotesMod[layout.index % baseNotesMod.length];
+                    const freshMidiNote = updatedBaseNote + this.getEffectiveTranspose();
+                    const finalVel = this.humanizeVelocity(layout.vel);
+                    
+                    this.sendMidi(0x90, this.melodyChannel, freshMidiNote, finalVel);
+                    this.activeMidiNotes.set(key, updatedBaseNote);
+                    document.getElementById('display-melody').innerText = getNoteName(freshMidiNote);
+                }
+            }
+
+            updateRightHandLabels() {
+                if (!this.currentChordKey) return;
+                const profile = this.chordMap[this.currentChordKey];
+                for (let [key, layout] of Object.entries(this.rightHandLayout)) {
+                    const baseNotesMod = this.modifyPitches(profile[layout.row]);
+                    const baseNote = baseNotesMod[layout.index % baseNotesMod.length];
+                    const finalMidiNote = baseNote + this.getEffectiveTranspose();
+                    const element = document.getElementById(`note-${key}`);
+                    if (element) element.innerText = getNoteName(finalMidiNote);
+                }
+            }
+
+            clearRightHandLabels() {
+                for (let key of Object.keys(this.rightHandLayout)) {
+                    const element = document.getElementById(`note-${key}`);
+                    if (element) element.innerText = "-";
+                }
+            }
+
+            sendLoopChangePacket() {
+                const shapeIndex = this.calculateShapeIndex();
+                this.sendControlChange(this.loopChannel, 60, shapeIndex);
+                document.getElementById('display-melody').innerText = `CC#60 Index: ${shapeIndex}`;
+            }
+
+            sendLoopStopPacket() {
+                this.sendControlChange(this.loopChannel, 60, 0);
+                document.getElementById('display-melody').innerText = `CC#60 Stop (0)`;
+            }
+
+            updateTuningUI() {
+                const globalRootIndex = (1200000 + this.globalTransposeOffset) % 12;
+                let text = `Root: ${SCALE_NAMES[globalRootIndex]} (${this.globalTransposeOffset})`;
+                
+                let modLabels = [];
+                if (this.modifiers.flatten) modLabels.push("FLAT");
+                if (this.modifiers.inv1) modLabels.push("1st INV");
+                if (this.modifiers.inv2) modLabels.push("2nd INV");
+                if (this.modifiers.inv3) modLabels.push("3rd INV");
+                if (this.modifiers.seventh) modLabels.push("+7th EXT");
+                
+                if (modLabels.length > 0) {
+                    text += ` <span class="latched-alert">[Active Mods: ${modLabels.join(" | ")}]</span>`;
+                }
+                document.getElementById('display-tuning').innerHTML = text;
+            }
+
+            sendControlChange(channel, controllerNumber, value) {
+                if (!this.output) return;
+                const ccStatusByte = 0xB0 | (channel & 0x0F);
+                this.output.send([ccStatusByte, controllerNumber, value]);
+            }
+
+            sendMidi(status, ch, note, vel) {
+                if (!this.output) return;
+                this.output.send([status | (ch & 0x0F), note, vel]);
+            }
+        }
+
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then(access => {
+                const outputs = Array.from(access.outputs.values());
+                if (outputs.length > 0) {
+                    document.getElementById('midi-status').innerText = `🟢 System Online. Output Device: ${outputs[3].name}`;
+                    new QwertyMidiController(outputs[3]);
+                } else {
+                    document.getElementById('midi-status').innerText = "🟡 Visual Sandbox Mode Active (No virtual MIDI output loop found).";
+                    new QwertyMidiController(null);
+                }
+            }).catch(() => {
+                document.getElementById('midi-status').innerText = "🔴 Access to Web MIDI API blocked by browser permissions.";
+            });
+        } else {
+            document.getElementById('midi-status').innerText = "🔴 Web MIDI API is not natively supported in this browser version.";
+        }
+    </script>
+</body>
+</html>
